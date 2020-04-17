@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <cmath>
 #include <string>
 #include <exception>
 #include <algorithm>
@@ -12,6 +13,7 @@
 #include <io.h>
 #include <fcntl.h>
 #include <windows.h>
+#include <commctrl.h>
 #include <resource.h>
 
 #include "dither.h"
@@ -23,6 +25,7 @@
 #include <boost/timer/timer.hpp>
 #include <boost/algorithm/string.hpp>
 
+#include "stb_image_resize.h"
 #include "stb_image_write.h"
 #include "stb_image.h"
 
@@ -55,6 +58,8 @@ HWND hEditPalletePath;
 HWND hEditScaleX;
 HWND hEditScaleY;
 HWND hEditColorMode;
+
+HWND hHueTrack;
 
 HWND hColorList;
 
@@ -300,7 +305,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		"Dither GUI",
 		WS_OVERLAPPED | WS_MINIMIZEBOX | WS_SYSMENU,
 		CW_USEDEFAULT, CW_USEDEFAULT,
-		350, 315,
+		350, 345,
 		NULL,
 		NULL,
 		NULL,
@@ -390,7 +395,104 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						MessageBox(NULL,"empty pallete","exception",0);
 						return 0;
 					}
+					if(IsDlgButtonChecked(hWnd,IDC_OPTIMIZECHECKBOX))
+					{
+						float multiplyScale = SendMessage(hHueTrack,TBM_GETPOS,0,0)/100.0;
+
+						std::string convertedInputString = (currentPATH / "output" / inputPATH.filename().stem()).string()+"CONVERTED.png";
+						std::array<float, 3> avgColor = {0,0,0};
+						std::array<float, 3> avgImageColor = {0,0,0};
+						std::array<float, 3> colorMultiply = {0,0,0};
+						float colorAmount = color_pallete.size();
+						for(int i = 0; i < colorAmount; i++)
+						{
+							avgColor[0]+=color_pallete[i][0]/colorAmount;
+							avgColor[1]+=color_pallete[i][1]/colorAmount;
+							avgColor[2]+=color_pallete[i][2]/colorAmount;
+						}
+
+						int width, height, bpp;
+						int widthR, heightR;
+
+						int colors = 3;
+						colors += transparency;
+
+						unsigned char *image_unres = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
+
+						size_t image_unres_size = width * height * bpp;
+
+						widthR = round((float)width * scaleX);
+						heightR = round((float)height * scaleY);
+
+						size_t image_size = widthR * heightR * bpp;
+
+						unsigned char *image = (unsigned char*)malloc(image_size);
+
+						stbir_resize_uint8(image_unres, width, height, 0, image, widthR, heightR, 0, bpp);
+
+						width = widthR;
+						height = heightR;
+
+						size_t output_size = width * height * colors;
+
+						size_t pixel_amount = width*height;
+
+						unsigned char *output_image = (unsigned char*)malloc(output_size);
+
+						for(unsigned char *p = image; p != image+image_size; p += bpp)
+						{
+							float t = 1;
+
+							if(bpp==4)
+							{
+								t = (*(p+3))/255.0;
+							}
+
+							avgImageColor[0]+=(*p)*t;
+							avgImageColor[1]+=(*(p+1))*t;
+							avgImageColor[2]+=(*(p+2))*t;
+						}
+
+						avgImageColor[0]/=pixel_amount;
+						avgImageColor[1]/=pixel_amount;
+						avgImageColor[2]/=pixel_amount;
+
+						colorMultiply[0]=multiplyScale+(avgColor[0]/avgImageColor[0])*(1-multiplyScale);
+						colorMultiply[1]=multiplyScale+(avgColor[1]/avgImageColor[1])*(1-multiplyScale);
+						colorMultiply[2]=multiplyScale+(avgColor[2]/avgImageColor[2])*(1-multiplyScale);
+						
+						for(unsigned char *p = image, *po = output_image; p != image+image_size; p += bpp, po += colors)
+						{
+							int t = 1;
+
+							int color[3];
+
+							if(bpp==4)
+							{
+								t = (*(p+3))/255.0;
+							}
+							color[0] = std::round(((*p)*colorMultiply[0]) > 255 ? 255 : ((*p)*colorMultiply[0]))*t;
+							color[1] = std::round(((*(p+1))*colorMultiply[1]) > 255 ? 255 : ((*(p+1))*colorMultiply[1]))*t;
+							color[2] = std::round(((*(p+2))*colorMultiply[2]) > 255 ? 255 : ((*(p+2))*colorMultiply[2]))*t;
+
+							*po = (uint8_t)color[0];
+							*(po+1) = (uint8_t)color[1];
+							*(po+2) = (uint8_t)color[2];
+							if(transparency==1)
+							{
+								*(po+3) = *(p+3)==255?255:0;
+							}
+						}
+
+						stbi_write_png(convertedInputString.c_str(), width, height, colors, output_image, width * colors);
+
+						stbi_image_free(image_unres);
+						
+						dither_image(convertedInputString,(outputPATH.string()+".png"),color_pallete,1,1,color_mode,0,transparency);
+					} else
+					{
 					dither_image(inputPATH.string(),(outputPATH.string()+".png"),color_pallete,scaleX,scaleY,color_mode,0,transparency);
+					}
 				} else
 				{
 					MessageBox(NULL,"input file doesn't exist","exception",0);
@@ -422,6 +524,17 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				} else
 				{
 					CheckDlgButton(hWnd,IDC_TRANSPARENCYCHECKBOX,BST_CHECKED);
+				}
+			}
+
+			if(LOWORD(wParam)==IDC_OPTIMIZECHECKBOX)
+			{
+				if(IsDlgButtonChecked(hWnd,IDC_OPTIMIZECHECKBOX))
+				{
+					CheckDlgButton(hWnd,IDC_OPTIMIZECHECKBOX,BST_UNCHECKED);
+				} else
+				{
+					CheckDlgButton(hWnd,IDC_OPTIMIZECHECKBOX,BST_CHECKED);
 				}
 			}
 			
@@ -994,29 +1107,34 @@ void AddControls(HWND hWnd)
 	SetWindowLongPtr(hEditPalletePath,GWL_WNDPROC,(LONG_PTR)&EditPrc);
 	CreateWindow("button","...",WS_VISIBLE|WS_CHILD,175,40,25,25,hWnd,(HMENU)IDC_BROWSEPALLETEBUTTON,NULL,NULL);
 	
-	CreateWindow("static","size multipliers",WS_VISIBLE|WS_CHILD|ES_CENTER,15,80,150,25,hWnd,NULL,NULL,NULL);
+	CreateWindow("static","size multipliers",WS_VISIBLE|WS_CHILD|ES_CENTER,15,70,150,25,hWnd,NULL,NULL,NULL);
 	
-	CreateWindow("static","X",WS_VISIBLE|WS_CHILD|ES_CENTER,15,105,50,25,hWnd,NULL,NULL,NULL);
-	hEditScaleX = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1.0",WS_VISIBLE|WS_CHILD|ES_AUTOHSCROLL,15,130,50,25,hWnd,NULL,NULL,NULL);
+	CreateWindow("static","X",WS_VISIBLE|WS_CHILD|ES_CENTER,15,90,50,25,hWnd,NULL,NULL,NULL);
+	hEditScaleX = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1.0",WS_VISIBLE|WS_CHILD|ES_AUTOHSCROLL,15,115,50,25,hWnd,NULL,NULL,NULL);
 	SetWindowLongPtr(hEditScaleX,GWL_WNDPROC,(LONG_PTR)&EditPrc);
 	
-	CreateWindow("static","Y",WS_VISIBLE|WS_CHILD|ES_CENTER,115,105,50,25,hWnd,NULL,NULL,NULL);
-	hEditScaleY = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1.0",WS_VISIBLE|WS_CHILD|ES_AUTOHSCROLL,115,130,50,25,hWnd,NULL,NULL,NULL);
+	CreateWindow("static","Y",WS_VISIBLE|WS_CHILD|ES_CENTER,115,90,50,25,hWnd,NULL,NULL,NULL);
+	hEditScaleY = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1.0",WS_VISIBLE|WS_CHILD|ES_AUTOHSCROLL,115,115,50,25,hWnd,NULL,NULL,NULL);
 	SetWindowLongPtr(hEditScaleY,GWL_WNDPROC,(LONG_PTR)&EditPrc);
 	
-	CreateWindow("button","transparency",WS_VISIBLE|WS_CHILD|BS_CHECKBOX,15,155,150,35,hWnd,(HMENU)IDC_TRANSPARENCYCHECKBOX,NULL,NULL);
+	CreateWindow("button","optimize image hue",WS_VISIBLE|WS_CHILD|BS_CHECKBOX,15,140,150,25,hWnd,(HMENU)IDC_OPTIMIZECHECKBOX,NULL,NULL);
+
+	hHueTrack = CreateWindowEx(0,TRACKBAR_CLASS,"hue trackbar",WS_CHILD|WS_VISIBLE,15,165,150,25,hWnd,NULL,NULL,NULL);
+	SendMessage(hHueTrack,TBM_SETRANGE,(WPARAM)TRUE,(LPARAM) MAKELONG(0, 100));
+
+	CreateWindow("button","transparency",WS_VISIBLE|WS_CHILD|BS_CHECKBOX,15,195,150,25,hWnd,(HMENU)IDC_TRANSPARENCYCHECKBOX,NULL,NULL);
 	
-	CreateWindow("static","color mode",WS_VISIBLE|WS_CHILD|ES_CENTER,65,190,100,25,hWnd,NULL,NULL,NULL);
-	hEditColorMode = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1",WS_VISIBLE|WS_CHILD,15,190,50,25,hWnd,NULL,NULL,NULL);
+	CreateWindow("static","color mode",WS_VISIBLE|WS_CHILD|ES_CENTER,65,220,100,25,hWnd,NULL,NULL,NULL);
+	hEditColorMode = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1",WS_VISIBLE|WS_CHILD,15,220,50,25,hWnd,NULL,NULL,NULL);
 	
 	CreateWindow("button","load",WS_VISIBLE|WS_CHILD,175,70,65,25,hWnd,(HMENU)IDC_COLORLOADBUTTON,NULL,NULL);
 	CreateWindow("button","clear",WS_VISIBLE|WS_CHILD,260,70,65,25,hWnd,(HMENU)IDC_COLORCLEARBUTTON,NULL,NULL);
 	
-	hColorList = CreateWindowEx(WS_EX_CLIENTEDGE,"listbox",NULL,WS_VISIBLE|WS_CHILD|WS_VSCROLL|LBS_DISABLENOSCROLL|LBS_HASSTRINGS|LBS_OWNERDRAWFIXED|LBS_NOTIFY,175,105,150,135,hWnd,(HMENU)IDC_COLORLIST,NULL,NULL);
-	CreateWindow("button","add",WS_VISIBLE|WS_CHILD,175,240,75,20,hWnd,(HMENU)IDC_ADDCOLORBUTTON,NULL,NULL);
-	CreateWindow("button","delete",WS_VISIBLE|WS_CHILD,250,240,75,20,hWnd,(HMENU)IDC_DELETECOLORBUTTON,NULL,NULL);
+	hColorList = CreateWindowEx(WS_EX_CLIENTEDGE,"listbox",NULL,WS_VISIBLE|WS_CHILD|WS_VSCROLL|LBS_DISABLENOSCROLL|LBS_HASSTRINGS|LBS_OWNERDRAWFIXED|LBS_NOTIFY,175,105,150,165,hWnd,(HMENU)IDC_COLORLIST,NULL,NULL);
+	CreateWindow("button","add",WS_VISIBLE|WS_CHILD,175,270,75,20,hWnd,(HMENU)IDC_ADDCOLORBUTTON,NULL,NULL);
+	CreateWindow("button","delete",WS_VISIBLE|WS_CHILD,250,270,75,20,hWnd,(HMENU)IDC_DELETECOLORBUTTON,NULL,NULL);
 	
-	CreateWindow("button","convert",WS_VISIBLE|WS_CHILD|WS_BORDER,15,225,150,35,hWnd,(HMENU)IDC_CONVERTBUTTON,NULL,NULL);
+	CreateWindow("button","convert",WS_VISIBLE|WS_CHILD|WS_BORDER,15,255,150,35,hWnd,(HMENU)IDC_CONVERTBUTTON,NULL,NULL);
 }
 
 void AddControlsITT(HWND hWnd)
