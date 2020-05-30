@@ -43,7 +43,7 @@ void DisplaySplitDialog(HWND);
 bool RegisterTACDialog(HINSTANCE);
 void DisplayTACDialog(HWND,int);
 void OpenFile(HWND,HWND);
-DWORD ColorDialogue(HWND,DWORD);
+bool ColorDialogue(HWND,DWORD*);
 bool AddColor(HWND,DWORD);
 
 COLORREF colorWhite;
@@ -598,16 +598,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			
 			if(LOWORD(wParam)==IDC_DELETECOLORBUTTON)
 			{
-				selItem = (int)SendMessage(hColorList,LB_GETCURSEL,0,0);
-				if(selItem==-1)
+				if((int)SendMessage(hColorList,LB_GETCOUNT,0,0)>0)
 				{
-					selItem = (int)SendMessage(hColorList,LB_GETCOUNT,0,0)-1;
+					selItem = (int)SendMessage(hColorList,LB_GETCURSEL,0,0);
+					if(selItem==-1)
+					{
+						selItem = (int)SendMessage(hColorList,LB_GETCOUNT,0,0)-1;
+					}
+					
+					std::array<int,3> color = colorFromIndex(selItem, hColorList);
+					
+					color_pallete.erase(std::find(color_pallete.begin(),color_pallete.end(),color));
+					SendMessage(hColorList,LB_DELETESTRING,selItem,0);
 				}
-				
-				std::array<int,3> color = colorFromIndex(selItem, hColorList);
-				
-				color_pallete.erase(std::find(color_pallete.begin(),color_pallete.end(),color));
-				SendMessage(hColorList,LB_DELETESTRING,selItem,0);
 			}
 			
 			break;
@@ -830,10 +833,11 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 			}
 			if(LOWORD(wParam)==IDC_SELECTMERGECOLORBUTTON)
 			{
-				DWORD result = ColorDialogue(hWnd,splitMergeColor);
-				if(result!=(DWORD)false)
+				DWORD defaultColor = splitMergeColor;
+				bool result = ColorDialogue(hWnd,&splitMergeColor);
+				if(result==false)
 				{
-					splitMergeColor = result;
+					splitMergeColor = defaultColor;
 				}
 				RedrawWindow(hSplitMergeButton,0,0,RDW_INVALIDATE);
 			}
@@ -1273,37 +1277,38 @@ void OpenFile(HWND hWnd, HWND textBox)
 	SetWindowText(textBox,filename);
 }
 
-DWORD ColorDialogue(HWND hWnd, DWORD defColor)
+bool ColorDialogue(HWND hWnd, DWORD* returnColor)
 {
 	CHOOSECOLOR cc;
 
 	static COLORREF custClrs[16];
-	DWORD colorCR = defColor;
 
 	ZeroMemory(&cc,sizeof(CHOOSECOLOR));
 
 	cc.lStructSize = sizeof(CHOOSECOLOR);
 	cc.hwndOwner = hWnd;
 	cc.lpCustColors = custClrs;
-	cc.rgbResult = colorCR;
+	cc.rgbResult = *returnColor;
 	cc.Flags = CC_FULLOPEN | CC_RGBINIT;
 
 	if(!ChooseColor(&cc))
 	{
-		return (DWORD)false;
+		return false;
 	}
 
-	colorCR = cc.rgbResult;
+	*returnColor = cc.rgbResult;
+	//MessageBox(NULL,std::to_string(returnColor).c_str(),"1",0);
 
-	return colorCR;
+	return true;
 }
 
 bool AddColor(HWND hWnd, DWORD defColor)
 {
 	DWORD colorCR;
+	colorCR = defColor;
 
-	colorCR = ColorDialogue(hWnd,defColor);
-	if(colorCR==(DWORD)false)
+	bool result = ColorDialogue(hWnd,&colorCR);
+	if(result==false)
 	{
 		return false;
 	}
