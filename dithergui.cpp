@@ -9,6 +9,7 @@
 #include <codecvt>
 #include <iomanip>
 #include <sstream>
+#include <bitset>
 
 #include <io.h>
 #include <fcntl.h>
@@ -36,12 +37,15 @@ void AddControls(HWND);
 void AddControlsITT(HWND);
 void AddControlsTAC(HWND);
 void AddControlsSplit(HWND);
+void AddControlsBWB(HWND);
 bool RegisterITTDialog(HINSTANCE);
 void DisplayITTDialog(HWND);
 bool RegisterSplitDialog(HINSTANCE);
 void DisplaySplitDialog(HWND);
 bool RegisterTACDialog(HINSTANCE);
 void DisplayTACDialog(HWND,int);
+bool RegisterBWBDialog(HINSTANCE);
+void DisplayBWBDialog(HWND);
 void OpenFile(HWND,HWND);
 bool ColorDialogue(HWND,DWORD*);
 bool AddColor(HWND,DWORD);
@@ -76,6 +80,10 @@ HWND hSplitColorGroupList;
 
 HWND hSplitDialog;
 HWND hSplitMergeButton;
+
+HWND hBWBInputPath;
+HWND hBWBDialog;
+HWND hBWBConvertButton;
 
 HWND hTACString;
 
@@ -288,6 +296,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	if(!RegisterSplitDialog(hInstance))
 	{
 		MessageBox(NULL,"registering split dialog class failed","exception",0);
+
+		return 0;
+	}
+	
+	if(!RegisterBWBDialog(hInstance))
+	{
+		MessageBox(NULL,"registering bwb dialog class failed","exception",0);
 
 		return 0;
 	}
@@ -514,6 +529,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			if(LOWORD(wParam)==IDC_SPLITCOLORMENU)
 			{
 				DisplaySplitDialog(hWnd);
+			}
+			
+			if(LOWORD(wParam)==IDC_BWBRAILLEMENU)
+			{
+				DisplayBWBDialog(hWnd);
 			}
 			
 			if(LOWORD(wParam)==IDC_TRANSPARENCYCHECKBOX)
@@ -925,16 +945,16 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				GetWindowText(hITTInputPath,imagepathSTR,1024);
 				boost::filesystem::path inputPATH(imagepathSTR);
 				
-				unsigned char *pixels = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
-				size_t image_size = width * height * bpp;
-
-				boost::filesystem::path outputPATH = currentPATH / "output" / inputPATH.filename().stem();
-				
 				if(!boost::filesystem::exists(inputPATH.string()))
 				{
 					MessageBox(NULL,"input file doesn't exist","exception",0);
 					return 0;
 				}
+				
+				unsigned char *pixels = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
+				size_t image_size = width * height * bpp;
+
+				boost::filesystem::path outputPATH = currentPATH / "output" / inputPATH.filename().stem();
 				
 				boost::filesystem::create_directory((currentPATH / "output").string());
 				
@@ -1081,6 +1101,148 @@ LRESULT CALLBACK TacDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 	return 0;
 }
 
+LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch(message)
+	{
+		case WM_CREATE:
+			AddControlsBWB(hWnd);
+			break;
+
+		case WM_CLOSE:
+			SetFocus(mainWindow);
+			DestroyWindow(hWnd);
+			break;
+		
+		case WM_COMMAND:
+			if(LOWORD(wParam)==IDC_BROWSEBWBINPUTBUTTON)
+			{
+				OpenFile(hWnd,hBWBInputPath);
+			}
+			if(LOWORD(wParam)==IDC_BWBCONVERTBUTTON)
+			{
+				int width, height, bpp;
+				
+				char imagepathSTR[1024];
+				GetWindowText(hBWBInputPath,imagepathSTR,1024);
+				boost::filesystem::path inputPATH(imagepathSTR);
+
+				if(!boost::filesystem::exists(inputPATH.string()))
+				{
+					MessageBox(NULL,"input file doesn't exist","exception",0);
+					return 0;
+				}
+				
+				unsigned char *pixels = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
+				size_t image_size = width * height * bpp;
+
+				boost::filesystem::path outputPATH = currentPATH / "output" / inputPATH.filename().stem();
+				
+				boost::filesystem::create_directory((currentPATH / "output").string());
+				
+				std::string filepath = (outputPATH.string()+".txt");
+				
+				std::wofstream filestream(filepath.c_str());
+				
+				filestream.imbue(std::locale(filestream.getloc(), new std::codecvt_utf8_utf16<wchar_t>));
+				
+				int remainderY = height % 4;
+				int remainderX = width % 2;
+				
+				int yoff = remainderY>0?1:0;
+				
+				int smallImgSize = (height/4+yoff)*(width+remainderX)*3;
+				
+				//i say black and white to braille but it can take images of any color and just uses the first color channel and sees is it closer to black or white
+
+				boost::timer::cpu_timer timer;
+
+				int smallWidth = (width/2+remainderX);
+				
+				//MessageBox(NULL,("aaaaaaaaaaaaaaa: "+std::to_string((height))).c_str(),"B",0);
+				
+				int eap = 0;
+				for(unsigned char *p = pixels; p != pixels+smallImgSize; p += bpp*2, eap += bpp*2)
+				{
+					int w = (eap/(bpp*2))%smallWidth;
+					
+					int h = (eap/(bpp*2))/smallWidth;
+					
+					std::bitset<8> blockNUM;
+
+					int bitVals[8];
+
+					bitVals[0] = (*(p+(smallWidth*2*h*3*bpp))>127?0:1);
+					bitVals[3] = (*(p+bpp+(smallWidth*2*h*3*bpp))>127?0:1);
+
+					if(eap/(smallWidth*3)<(height/2))
+					{
+						bitVals[1] = (*(p+(smallWidth*2*(h*3+1)*bpp))>127?0:1);
+						bitVals[4] = (*(p+bpp+(smallWidth*2*(h*3+1)*bpp))>127?0:1);
+					} else
+					{
+						bitVals[1] = 0;
+						bitVals[4] = 0;
+					}
+						
+					if(eap/(smallWidth*3)<(height/2-1))
+					{
+						bitVals[2] = (*(p+(smallWidth*2*(h*3+2)*bpp))>127?0:1);
+						bitVals[5] = (*(p+bpp+(smallWidth*2*(h*3+2)*bpp))>127?0:1);
+					} else
+					{
+						bitVals[2] = 0;
+						bitVals[5] = 0;
+					}
+						
+					if(eap/(smallWidth*3)<(height/2-2))
+					{
+						bitVals[6] = (*(p+(smallWidth*2*(h*3+3)*bpp))>127?0:1);
+						bitVals[7] = (*(p+bpp+(smallWidth*2*(h*3+3)*bpp))>127?0:1);
+					} else
+					{
+						bitVals[6] = 0;
+						bitVals[7] = 0;
+					}
+					
+					blockNUM.set(0,bitVals[0]);
+					blockNUM.set(1,bitVals[1]);
+					blockNUM.set(2,bitVals[2]);
+					blockNUM.set(3,bitVals[3]);
+					blockNUM.set(4,bitVals[4]);
+					blockNUM.set(5,bitVals[5]);
+					blockNUM.set(6,bitVals[6]);
+					blockNUM.set(7,bitVals[7]);
+					
+					filestream << (wchar_t)(0x2800+blockNUM.to_ulong());
+					
+					//MessageBox(NULL,(std::to_string(w)+std::to_string((width/2+remainderX)-1)).c_str(),"a",0);
+					if(w==(smallWidth-1))
+					{
+						//MessageBox(NULL,"aaaaaaaaaaaaaaaaaaaa","B",0);
+						filestream << "\n";
+					}
+				}
+				
+				filestream.close();
+				stbi_image_free(pixels);
+				
+				std::string finish_message;
+				finish_message = "conversion complete in ";
+				finish_message += timer.format(3,"%w");
+				
+				MessageBox(NULL,finish_message.c_str(),"status",0);
+				
+			}
+			break;
+
+		default:
+			return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	
+	return 0;
+}
+
 LRESULT CALLBACK EditPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	if(message==WM_CHAR&&wParam==1)
@@ -1098,6 +1260,7 @@ void AddControls(HWND hWnd)
 	
 	AppendMenu(hMenu,MF_STRING,IDC_TOTEXTMENU,"ITT");
 	AppendMenu(hMenu,MF_STRING,IDC_SPLITCOLORMENU,"Split colors");
+	AppendMenu(hMenu,MF_STRING,IDC_BWBRAILLEMENU,"BW to braille");
 	
 	SetMenu(hWnd, hMenu);
 	
@@ -1178,6 +1341,16 @@ void AddControlsSplit(HWND hWnd)
 	CreateWindow("button","convert",WS_VISIBLE|WS_CHILD|WS_BORDER,15,110,150,35,hWnd,(HMENU)IDC_SPLITCOLORSBUTTON,NULL,NULL);
 }
 
+void AddControlsBWB(HWND hWnd)
+{
+	CreateWindow("static","path to input image",WS_VISIBLE|WS_CHILD|ES_CENTER,15,15,150,25,hWnd,NULL,NULL,NULL);
+	hBWBInputPath = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","c:/sample/path/image.png",WS_VISIBLE|WS_CHILD|ES_AUTOHSCROLL,40,40,125,25,hWnd,NULL,NULL,NULL);
+	(WNDPROC)SetWindowLongPtr(hBWBInputPath,GWL_WNDPROC,(LONG_PTR)&EditPrc);
+	CreateWindow("button","...",WS_VISIBLE|WS_CHILD,15,40,25,25,hWnd,(HMENU)IDC_BROWSEBWBINPUTBUTTON,NULL,NULL);
+
+	CreateWindow("button","convert",WS_VISIBLE|WS_CHILD|WS_BORDER,15,75,150,35,hWnd,(HMENU)IDC_BWBCONVERTBUTTON,NULL,NULL);
+}
+
 void AddControlsTAC(HWND hWnd)
 {
 	std::array<int,3> color = colorFromIndex(TACSelItem, hPixelInfoList);
@@ -1256,6 +1429,24 @@ bool RegisterSplitDialog(HINSTANCE hInstance)
 	return true;
 }
 
+bool RegisterBWBDialog(HINSTANCE hInstance)
+{
+	WNDCLASS wc = {};
+
+	wc.lpfnWndProc    = BWBDialogPrc;
+	wc.hInstance      = hInstance;
+	wc.hCursor        = LoadCursor(NULL, IDC_ARROW);
+	wc.hbrBackground  = (HBRUSH)COLOR_WINDOW;
+	wc.lpszClassName  = "MyBWBDialogClass";
+
+	if(!RegisterClass(&wc))
+	{
+		MessageBox(NULL,"call to registerclass failed","exception",0);
+		return false;
+	}
+	return true;
+}
+
 void OpenFile(HWND hWnd, HWND textBox)
 {
 	OPENFILENAME ofn;
@@ -1297,7 +1488,6 @@ bool ColorDialogue(HWND hWnd, DWORD* returnColor)
 	}
 
 	*returnColor = cc.rgbResult;
-	//MessageBox(NULL,std::to_string(returnColor).c_str(),"1",0);
 
 	return true;
 }
@@ -1373,5 +1563,16 @@ void DisplaySplitDialog(HWND hWnd)
 		GetCursorPos(&p);
 
 		hSplitDialog = CreateWindow("MySplitDialogClass","split image by colors",WS_VISIBLE|WS_OVERLAPPED|WS_SYSMENU,p.x-200/2,p.y-100/2,570,185,hWnd,NULL,NULL,NULL);
+	}
+}
+
+void DisplayBWBDialog(HWND hWnd)
+{
+	if(!IsWindow(hBWBDialog))
+	{
+		POINT p;
+		GetCursorPos(&p);
+
+		hBWBDialog = CreateWindow("MyBWBDialogClass","convert black white img to braille",WS_VISIBLE|WS_OVERLAPPED|WS_SYSMENU,p.x-200/2,p.y-100/2,190,145,hWnd,NULL,NULL,NULL);
 	}
 }
