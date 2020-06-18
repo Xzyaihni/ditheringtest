@@ -97,6 +97,7 @@ HWND hSizeXText;
 HWND hSizeYText;
 HWND hSizeXEdit;
 HWND hSizeYEdit;
+HWND hSizeExactText;
 HWND hSizeTotalEdit;
 HWND hSizeTotalText;
 HWND hSizeTotalAspect;
@@ -443,8 +444,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 					if(resizeMode==1)
 					{
-						scaleX = targetX / width;
-						scaleY = targetY / height;
+						if(targetX==-1||targetY==-1)
+						{
+							if(targetX==targetY)
+							{
+								scaleX = 1;
+								scaleY = 1;
+							}
+							float ratio;
+							if(targetY==-1)
+							{
+								ratio = (float)width/height;
+								scaleX = targetX/width;
+								scaleY = (targetX/ratio)/height;
+							}
+							if(targetX==-1)
+							{
+								ratio = (float)height/width;
+								scaleY = targetY/height;
+								scaleX = (targetY/ratio)/width;
+							}
+						} else
+						{
+							scaleX = targetX / width;
+							scaleY = targetY / height;
+						}
 					}
 
 					if(resizeMode==2)
@@ -472,8 +496,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						scaleY = scaleX;
 					}
 
-					int bpp;
-					unsigned char *image_unres = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
+					
 
 					if(resizeMode==2 && (round((float)width * scaleX) * round((float)height * scaleY))>targetX)
 					{
@@ -502,10 +525,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 							avgColor[2]+=color_pallete[i][2]/colorAmount;
 						}
 
+						int width,height,bpp;
 						int widthR, heightR;
 
 						int colors = 3;
 						colors += transparency;
+
+						unsigned char *image_unres = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
 
 						size_t image_unres_size = width * height * bpp;
 
@@ -574,6 +600,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 						stbi_write_png(convertedInputString.c_str(), width, height, colors, output_image, width * colors);
 						
+						stbi_image_free(image_unres);
+
 						dither_image(convertedInputString,(outputPATH.string()+".png"),color_pallete,1,1,color_mode,0,transparency);
 					} else
 					{
@@ -582,8 +610,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						//MessageBox(NULL,std::to_string(scaleY).c_str(),"Y",0);
 					dither_image(inputPATH.string(),(outputPATH.string()+".png"),color_pallete,scaleX,scaleY,color_mode,0,transparency);
 					}
-
-					stbi_image_free(image_unres);
 				} else
 				{
 					MessageBox(NULL,"input file doesn't exist","exception",0);
@@ -1327,15 +1353,17 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 void UpdateDialogues(int mode)
 {
 	int state0 = (mode==0||mode==1) ? SW_SHOW : SW_HIDE;
-	int state1 = (mode==2||mode==3) ? SW_SHOW : SW_HIDE;
-	int state2 = (mode==2) ? SW_SHOW : SW_HIDE;
+	int state1 = (mode==1) ? SW_SHOW : SW_HIDE;
+	int state2 = (mode==2||mode==3) ? SW_SHOW : SW_HIDE;
+	int state3 = (mode==2) ? SW_SHOW : SW_HIDE;
 	ShowWindow(hSizeXEdit, state0);
 	ShowWindow(hSizeYEdit, state0);
 	ShowWindow(hSizeXText, state0);
 	ShowWindow(hSizeYText, state0);
-	ShowWindow(hSizeTotalEdit, state1);
-	ShowWindow(hSizeTotalText, state2);
-	ShowWindow(hSizeTotalAspect, state2);
+	ShowWindow(hSizeExactText, state1);
+	ShowWindow(hSizeTotalEdit, state2);
+	ShowWindow(hSizeTotalText, state3);
+	ShowWindow(hSizeTotalAspect, state3);
 }
 
 LRESULT CALLBACK SizeDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -1356,10 +1384,21 @@ LRESULT CALLBACK SizeDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
 			}
 		} else
 		{
+			std::string xString;
+			std::string yString;
+			if(resizeMode==1)
+			{
+				xString = std::to_string((int)round(targetX));
+				yString = std::to_string((int)round(targetY));
+			} else
+			{
+				xString = std::to_string(targetX);
+				yString = std::to_string(targetY);
+			}
 			SendMessage(hSizeXEdit,EM_SETSEL,0,-1);
-			SendMessage(hSizeXEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)(std::to_string((int)round(targetX))).c_str());
+			SendMessage(hSizeXEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)xString.c_str());
 			SendMessage(hSizeYEdit,EM_SETSEL,0,-1);
-			SendMessage(hSizeYEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)(std::to_string((int)round(targetY))).c_str());
+			SendMessage(hSizeYEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)yString.c_str());
 		}
 		UpdateDialogues(resizeMode);
 		break;
@@ -1398,6 +1437,21 @@ LRESULT CALLBACK SizeDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
 		if(HIWORD(wParam) == CBN_SELCHANGE)
 		{
 			resizeMode = SendMessage((HWND)lParam, CB_GETCURSEL, 0, 0);
+
+			if(resizeMode==0)
+			{
+				SendMessage(hSizeXEdit,EM_SETSEL,0,-1);
+				SendMessage(hSizeXEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)"1.0");
+				SendMessage(hSizeYEdit,EM_SETSEL,0,-1);
+				SendMessage(hSizeYEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)"1.0");
+			}
+			if(resizeMode==1)
+			{
+				SendMessage(hSizeXEdit,EM_SETSEL,0,-1);
+				SendMessage(hSizeXEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)"512");
+				SendMessage(hSizeYEdit,EM_SETSEL,0,-1);
+				SendMessage(hSizeYEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)"-1");
+			}
 			
 			UpdateDialogues(resizeMode);
 		}
@@ -1531,10 +1585,12 @@ void AddControlsSize(HWND hWnd)
 	SendMessage(hSizeComboBox, CB_SETCURSEL, (WPARAM)0, 0);
 
 	hSizeXText = CreateWindow("static","X",WS_VISIBLE|WS_CHILD|ES_CENTER,15,45,50,25,hWnd,NULL,NULL,NULL);
-	hSizeXEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1",WS_VISIBLE|WS_CHILD,15,65,50,25,hWnd,NULL,NULL,NULL);
+	hSizeXEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","",WS_VISIBLE|WS_CHILD,15,65,50,25,hWnd,NULL,NULL,NULL);
 
 	hSizeYText = CreateWindow("static","Y",WS_VISIBLE|WS_CHILD|ES_CENTER,100,45,50,25,hWnd,NULL,NULL,NULL);
-	hSizeYEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1",WS_VISIBLE|WS_CHILD,115,65,50,25,hWnd,NULL,NULL,NULL);
+	hSizeYEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","",WS_VISIBLE|WS_CHILD,115,65,50,25,hWnd,NULL,NULL,NULL);
+
+	hSizeExactText = CreateWindow("static","-1 to keep ratio",WS_VISIBLE|WS_CHILD|ES_CENTER,15,100,150,25,hWnd,NULL,NULL,NULL);
 
 	hSizeTotalEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1024",WS_VISIBLE|WS_CHILD,15,45,150,25,hWnd,NULL,NULL,NULL);
 	hSizeTotalText = CreateWindow("static","ratio (from 0 to 2)",WS_VISIBLE|WS_CHILD|ES_CENTER,15,75,150,25,hWnd,NULL,NULL,NULL);
