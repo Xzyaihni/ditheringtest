@@ -38,6 +38,7 @@ void AddControlsITT(HWND);
 void AddControlsTAC(HWND);
 void AddControlsSplit(HWND);
 void AddControlsBWB(HWND);
+void AddControlsSize(HWND);
 bool RegisterITTDialog(HINSTANCE);
 void DisplayITTDialog(HWND);
 bool RegisterSplitDialog(HINSTANCE);
@@ -46,6 +47,8 @@ bool RegisterTACDialog(HINSTANCE);
 void DisplayTACDialog(HWND,int);
 bool RegisterBWBDialog(HINSTANCE);
 void DisplayBWBDialog(HWND);
+bool RegisterSizeDialog(HINSTANCE);
+void DisplaySizeDialog(HWND);
 void OpenFile(HWND,HWND);
 bool ColorDialogue(HWND,DWORD*);
 bool AddColor(HWND,DWORD);
@@ -85,6 +88,19 @@ HWND hBWBInputPath;
 HWND hBWBDialog;
 HWND hBWBConvertButton;
 
+HWND hSizeInputPath;
+HWND hSizeDialog;
+HWND hSizeConvertButton;
+HWND hSizeComboBox;
+
+HWND hSizeXText;
+HWND hSizeYText;
+HWND hSizeXEdit;
+HWND hSizeYEdit;
+HWND hSizeTotalEdit;
+HWND hSizeTotalText;
+HWND hSizeTotalAspect;
+
 HWND hTACString;
 
 HWND hTACDialog;
@@ -105,6 +121,11 @@ std::vector<std::array<int,3>> color_pallete;
 
 std::vector<std::array<int,3>> split_color_pallete;
 std::vector<std::array<int,3>> split_color_group;
+
+float targetX = 1.0;
+float targetY = 1.0;
+
+int resizeMode = 0;
 
 typedef struct
 {
@@ -306,6 +327,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
 		return 0;
 	}
+
+	if(!RegisterSizeDialog(hInstance))
+	{
+		MessageBox(NULL,"registering size dialog class failed","exception",0);
+
+		return 0;
+	}
 	
 	if(!RegisterTACDialog(hInstance))
 	{
@@ -368,22 +396,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case WM_COMMAND:
 			if(LOWORD(wParam)==IDC_CONVERTBUTTON)
 			{			
-				char scaleXSTR[1024];
-				char scaleYSTR[1024];
-				double scaleX;
-				double scaleY;
-				
 				char inputSTR[1024];
 
 				char colormodeSTR[1024];
 				
-				GetWindowText(hEditScaleX,scaleXSTR,1024);
-				GetWindowText(hEditScaleY,scaleYSTR,1024);
 				GetWindowText(hEditInputPath,inputSTR,1024);
 				GetWindowText(hEditColorMode,colormodeSTR,1024);
-				
-				scaleX = std::stod(scaleXSTR);
-				scaleY = std::stod(scaleYSTR);
 				
 				boost::filesystem::path inputPATH(inputSTR);
 				
@@ -410,6 +428,46 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						MessageBox(NULL,"empty pallete","exception",0);
 						return 0;
 					}
+
+					float scaleX;
+					float scaleY;
+
+					int width, height;
+					stbi_load(inputPATH.string().c_str(), &width, &height, NULL, 0);
+
+					if(resizeMode==0)
+					{
+						scaleX = targetX;
+						scaleY = targetY;
+					}
+
+					if(resizeMode==1)
+					{
+						scaleX = targetX / width;
+						scaleY = targetY / height;
+					}
+
+					if(resizeMode==2)
+					{
+						float mul = std::sqrt(targetX/(width*height));
+						scaleX = mul*(targetY);
+						scaleY = mul*(2-(targetY));
+					}
+
+					int bpp;
+					unsigned char *image_unres = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
+
+					if(resizeMode==2 && (round((float)width * scaleX) * round((float)height * scaleY))>targetX)
+					{
+						if(scaleX>scaleY)
+						{
+							scaleX = (round((float)width * scaleX)-1)/(float)width;
+						} else
+						{
+							scaleY = (round((float)height * scaleY)-1)/(float)height;
+						}
+					}
+
 					if(IsDlgButtonChecked(hWnd,IDC_OPTIMIZECHECKBOX))
 					{
 						float multiplyScale = SendMessage(hHueTrack,TBM_GETPOS,0,0)/100.0;
@@ -426,13 +484,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 							avgColor[2]+=color_pallete[i][2]/colorAmount;
 						}
 
-						int width, height, bpp;
 						int widthR, heightR;
 
 						int colors = 3;
 						colors += transparency;
-
-						unsigned char *image_unres = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
 
 						size_t image_unres_size = width * height * bpp;
 
@@ -500,20 +555,23 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						}
 
 						stbi_write_png(convertedInputString.c_str(), width, height, colors, output_image, width * colors);
-
-						stbi_image_free(image_unres);
 						
 						dither_image(convertedInputString,(outputPATH.string()+".png"),color_pallete,1,1,color_mode,0,transparency);
 					} else
 					{
+						//MessageBox(NULL,std::to_string(resizeMode).c_str(),"mode",0);
+						//MessageBox(NULL,std::to_string(scaleX).c_str(),"X",0);
+						//MessageBox(NULL,std::to_string(scaleY).c_str(),"Y",0);
 					dither_image(inputPATH.string(),(outputPATH.string()+".png"),color_pallete,scaleX,scaleY,color_mode,0,transparency);
 					}
+
+					stbi_image_free(image_unres);
 				} else
 				{
 					MessageBox(NULL,"input file doesn't exist","exception",0);
 					return 0;
 				}
-				
+
 				std::string finish_message;
 				finish_message = "dithering complete in ";
 				finish_message += timer.format(3,"%w");
@@ -603,6 +661,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			if(LOWORD(wParam)==IDC_BROWSEPALLETEBUTTON)
 			{
 				OpenFile(hWnd,hEditPalletePath);
+			}
+			
+			if(LOWORD(wParam)==IDC_SIZECHANGEBUTTON)
+			{
+				DisplaySizeDialog(hWnd);
 			}
 			
 			if(LOWORD(wParam)==IDC_COLORCLEARBUTTON)
@@ -1243,6 +1306,108 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 	return 0;
 }
 
+void UpdateDialogues(bool totalMode)
+{
+	int state0 = totalMode ? SW_HIDE : SW_SHOW;
+	int state1 = totalMode ? SW_SHOW : SW_HIDE;
+	ShowWindow(hSizeXEdit, state0);
+	ShowWindow(hSizeYEdit, state0);
+	ShowWindow(hSizeXText, state0);
+	ShowWindow(hSizeYText, state0);
+	ShowWindow(hSizeTotalEdit, state1);
+	ShowWindow(hSizeTotalText, state1);
+	ShowWindow(hSizeTotalAspect, state1);
+}
+
+LRESULT CALLBACK SizeDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+	switch(message)
+	{
+	case WM_CREATE:
+		AddControlsSize(hWnd);
+		SendMessage(hSizeComboBox, CB_SETCURSEL, (WPARAM)resizeMode, 0);
+		if(resizeMode==2)
+		{
+			SendMessage(hSizeTotalEdit,EM_SETSEL,0,-1);
+			SendMessage(hSizeTotalEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)(std::to_string((int)round(targetX))).c_str());
+			SendMessage(hSizeTotalAspect,EM_SETSEL,0,-1);
+			SendMessage(hSizeTotalAspect,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)(std::to_string(targetY)).c_str());
+		} else
+		{
+			SendMessage(hSizeXEdit,EM_SETSEL,0,-1);
+			SendMessage(hSizeXEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)(std::to_string((int)round(targetX))).c_str());
+			SendMessage(hSizeYEdit,EM_SETSEL,0,-1);
+			SendMessage(hSizeYEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)(std::to_string((int)round(targetY))).c_str());
+		}
+		UpdateDialogues(resizeMode==2?true:false);
+		break;
+
+	case WM_CLOSE:
+		SetFocus(mainWindow);
+		DestroyWindow(hWnd);
+		break;
+
+	case WM_COMMAND:
+		if(LOWORD(wParam)==IDC_SIZEACCEPTBUTTON)
+		{
+			char xTextBox[1024];
+			char yTextBox[1024];
+
+			switch(resizeMode)
+			{
+				case 2:
+					GetWindowText(hSizeTotalEdit,xTextBox,1024);
+					GetWindowText(hSizeTotalAspect,yTextBox,1024);
+					break;
+				default:
+					GetWindowText(hSizeXEdit,xTextBox,1024);
+					GetWindowText(hSizeYEdit,yTextBox,1024);
+					break;
+
+			}
+
+			targetX = std::stod(xTextBox);
+			targetY = std::stod(yTextBox);
+
+			SetFocus(mainWindow);
+			DestroyWindow(hWnd);
+		}
+		if(HIWORD(wParam) == CBN_SELCHANGE)
+		{
+			int selIndex = SendMessage((HWND)lParam, CB_GETCURSEL, 0, 0);
+			
+			bool totalMode;
+			switch(selIndex)
+			{
+				case 0:
+					resizeMode = 0;
+					totalMode = false;
+					break;
+				case 1:
+					resizeMode = 1;
+					totalMode = false;
+					break;
+				case 2:
+					resizeMode = 2;
+					totalMode = true;
+					break;
+				default:
+					resizeMode = 0;
+					totalMode = false;
+					break;
+			}
+			
+			UpdateDialogues(totalMode);
+		}
+		break;
+
+	default:
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+
+	return 0;
+}
+
 LRESULT CALLBACK EditPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	if(message==WM_CHAR&&wParam==1)
@@ -1274,8 +1439,9 @@ void AddControls(HWND hWnd)
 	SetWindowLongPtr(hEditPalletePath,GWL_WNDPROC,(LONG_PTR)&EditPrc);
 	CreateWindow("button","...",WS_VISIBLE|WS_CHILD,175,40,25,25,hWnd,(HMENU)IDC_BROWSEPALLETEBUTTON,NULL,NULL);
 	
-	CreateWindow("static","size multipliers",WS_VISIBLE|WS_CHILD|ES_CENTER,15,70,150,25,hWnd,NULL,NULL,NULL);
+	CreateWindow("button","change size",WS_VISIBLE|WS_CHILD|WS_BORDER,15,80,150,35,hWnd,(HMENU)IDC_SIZECHANGEBUTTON,NULL,NULL);
 	
+	/*
 	CreateWindow("static","X",WS_VISIBLE|WS_CHILD|ES_CENTER,15,90,50,25,hWnd,NULL,NULL,NULL);
 	hEditScaleX = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1.0",WS_VISIBLE|WS_CHILD|ES_AUTOHSCROLL,15,115,50,25,hWnd,NULL,NULL,NULL);
 	SetWindowLongPtr(hEditScaleX,GWL_WNDPROC,(LONG_PTR)&EditPrc);
@@ -1283,6 +1449,7 @@ void AddControls(HWND hWnd)
 	CreateWindow("static","Y",WS_VISIBLE|WS_CHILD|ES_CENTER,115,90,50,25,hWnd,NULL,NULL,NULL);
 	hEditScaleY = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1.0",WS_VISIBLE|WS_CHILD|ES_AUTOHSCROLL,115,115,50,25,hWnd,NULL,NULL,NULL);
 	SetWindowLongPtr(hEditScaleY,GWL_WNDPROC,(LONG_PTR)&EditPrc);
+	*/
 	
 	CreateWindow("button","optimize image hue",WS_VISIBLE|WS_CHILD|BS_CHECKBOX,15,140,150,25,hWnd,(HMENU)IDC_OPTIMIZECHECKBOX,NULL,NULL);
 
@@ -1349,6 +1516,28 @@ void AddControlsBWB(HWND hWnd)
 	CreateWindow("button","...",WS_VISIBLE|WS_CHILD,15,40,25,25,hWnd,(HMENU)IDC_BROWSEBWBINPUTBUTTON,NULL,NULL);
 
 	CreateWindow("button","convert",WS_VISIBLE|WS_CHILD|WS_BORDER,15,75,150,35,hWnd,(HMENU)IDC_BWBCONVERTBUTTON,NULL,NULL);
+}
+
+void AddControlsSize(HWND hWnd)
+{
+	hSizeComboBox = CreateWindow(WC_COMBOBOX,"",CBS_DROPDOWNLIST|WS_CHILD|WS_OVERLAPPED|WS_VISIBLE,15,15,150,100,hWnd,NULL,NULL,NULL);
+	
+	SendMessage(hSizeComboBox, CB_ADDSTRING, 0, (LPARAM)TEXT("multipliers"));
+	SendMessage(hSizeComboBox, CB_ADDSTRING, 0, (LPARAM)TEXT("exact"));
+	SendMessage(hSizeComboBox, CB_ADDSTRING, 0, (LPARAM)TEXT("total"));
+	SendMessage(hSizeComboBox, CB_SETCURSEL, (WPARAM)0, 0);
+
+	hSizeXText = CreateWindow("static","X",WS_VISIBLE|WS_CHILD|ES_CENTER,15,45,50,25,hWnd,NULL,NULL,NULL);
+	hSizeXEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1",WS_VISIBLE|WS_CHILD,15,65,50,25,hWnd,NULL,NULL,NULL);
+
+	hSizeYText = CreateWindow("static","Y",WS_VISIBLE|WS_CHILD|ES_CENTER,100,45,50,25,hWnd,NULL,NULL,NULL);
+	hSizeYEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1",WS_VISIBLE|WS_CHILD,115,65,50,25,hWnd,NULL,NULL,NULL);
+
+	hSizeTotalEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1024",WS_VISIBLE|WS_CHILD,15,45,150,25,hWnd,NULL,NULL,NULL);
+	hSizeTotalText = CreateWindow("static","aspect ratio",WS_VISIBLE|WS_CHILD|ES_CENTER,15,75,150,25,hWnd,NULL,NULL,NULL);
+	hSizeTotalAspect = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1.0",WS_CHILD|WS_VISIBLE,15,100,150,25,hWnd,NULL,NULL,NULL);
+
+	CreateWindow("button","confirm",WS_VISIBLE|WS_CHILD|WS_BORDER,15,130,150,35,hWnd,(HMENU)IDC_SIZEACCEPTBUTTON,NULL,NULL);
 }
 
 void AddControlsTAC(HWND hWnd)
@@ -1438,6 +1627,24 @@ bool RegisterBWBDialog(HINSTANCE hInstance)
 	wc.hCursor        = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground  = (HBRUSH)COLOR_WINDOW;
 	wc.lpszClassName  = "MyBWBDialogClass";
+
+	if(!RegisterClass(&wc))
+	{
+		MessageBox(NULL,"call to registerclass failed","exception",0);
+		return false;
+	}
+	return true;
+}
+
+bool RegisterSizeDialog(HINSTANCE hInstance)
+{
+	WNDCLASS wc = {};
+
+	wc.lpfnWndProc    = SizeDialogPrc;
+	wc.hInstance      = hInstance;
+	wc.hCursor        = LoadCursor(NULL, IDC_ARROW);
+	wc.hbrBackground  = (HBRUSH)COLOR_WINDOW;
+	wc.lpszClassName  = "MySizeDialogClass";
 
 	if(!RegisterClass(&wc))
 	{
@@ -1574,5 +1781,16 @@ void DisplayBWBDialog(HWND hWnd)
 		GetCursorPos(&p);
 
 		hBWBDialog = CreateWindow("MyBWBDialogClass","convert black white img to braille",WS_VISIBLE|WS_OVERLAPPED|WS_SYSMENU,p.x-200/2,p.y-100/2,190,145,hWnd,NULL,NULL,NULL);
+	}
+}
+
+void DisplaySizeDialog(HWND hWnd)
+{
+	if(!IsWindow(hSizeDialog))
+	{
+		POINT p;
+		GetCursorPos(&p);
+
+		hSizeDialog = CreateWindow("MySizeDialogClass","resize end image",WS_VISIBLE|WS_OVERLAPPED|WS_SYSMENU,p.x-200/2,p.y-100/2,190,210,hWnd,NULL,NULL,NULL);
 	}
 }
