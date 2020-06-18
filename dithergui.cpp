@@ -450,8 +450,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					if(resizeMode==2)
 					{
 						float mul = std::sqrt(targetX/(width*height));
-						scaleX = mul*(targetY);
-						scaleY = mul*(2-(targetY));
+						if(targetY<1)
+						{
+							scaleX = mul*(1/targetY);
+							scaleY = mul*(targetY);
+						} else
+						{
+							float newTarget = 1-(targetY-1);
+							scaleX = mul*(newTarget);
+							scaleY = mul*(1/newTarget);
+						}
 					}
 
 					int bpp;
@@ -1534,7 +1542,7 @@ void AddControlsSize(HWND hWnd)
 	hSizeYEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1",WS_VISIBLE|WS_CHILD,115,65,50,25,hWnd,NULL,NULL,NULL);
 
 	hSizeTotalEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1024",WS_VISIBLE|WS_CHILD,15,45,150,25,hWnd,NULL,NULL,NULL);
-	hSizeTotalText = CreateWindow("static","aspect ratio",WS_VISIBLE|WS_CHILD|ES_CENTER,15,75,150,25,hWnd,NULL,NULL,NULL);
+	hSizeTotalText = CreateWindow("static","ratio (from 0 to 2)",WS_VISIBLE|WS_CHILD|ES_CENTER,15,75,150,25,hWnd,NULL,NULL,NULL);
 	hSizeTotalAspect = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","1.0",WS_CHILD|WS_VISIBLE,15,100,150,25,hWnd,NULL,NULL,NULL);
 
 	CreateWindow("button","confirm",WS_VISIBLE|WS_CHILD|WS_BORDER,15,130,150,35,hWnd,(HMENU)IDC_SIZEACCEPTBUTTON,NULL,NULL);
