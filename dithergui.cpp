@@ -462,6 +462,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						}
 					}
 
+					if(resizeMode==3)
+					{
+						int b = 2*width;
+						long a = width*height;
+						double discriminant = std::sqrt(std::pow(b,2)-4*a*(-targetX+2));
+						float x2 = (float)(b-discriminant)/(2*a);
+						scaleX = std::abs(x2);
+						scaleY = scaleX;
+					}
+
 					int bpp;
 					unsigned char *image_unres = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
 
@@ -1314,17 +1324,18 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 	return 0;
 }
 
-void UpdateDialogues(bool totalMode)
+void UpdateDialogues(int mode)
 {
-	int state0 = totalMode ? SW_HIDE : SW_SHOW;
-	int state1 = totalMode ? SW_SHOW : SW_HIDE;
+	int state0 = (mode==0||mode==1) ? SW_SHOW : SW_HIDE;
+	int state1 = (mode==2||mode==3) ? SW_SHOW : SW_HIDE;
+	int state2 = (mode==2) ? SW_SHOW : SW_HIDE;
 	ShowWindow(hSizeXEdit, state0);
 	ShowWindow(hSizeYEdit, state0);
 	ShowWindow(hSizeXText, state0);
 	ShowWindow(hSizeYText, state0);
 	ShowWindow(hSizeTotalEdit, state1);
-	ShowWindow(hSizeTotalText, state1);
-	ShowWindow(hSizeTotalAspect, state1);
+	ShowWindow(hSizeTotalText, state2);
+	ShowWindow(hSizeTotalAspect, state2);
 }
 
 LRESULT CALLBACK SizeDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -1334,12 +1345,15 @@ LRESULT CALLBACK SizeDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
 	case WM_CREATE:
 		AddControlsSize(hWnd);
 		SendMessage(hSizeComboBox, CB_SETCURSEL, (WPARAM)resizeMode, 0);
-		if(resizeMode==2)
+		if(resizeMode==2||resizeMode==3)
 		{
 			SendMessage(hSizeTotalEdit,EM_SETSEL,0,-1);
 			SendMessage(hSizeTotalEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)(std::to_string((int)round(targetX))).c_str());
-			SendMessage(hSizeTotalAspect,EM_SETSEL,0,-1);
-			SendMessage(hSizeTotalAspect,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)(std::to_string(targetY)).c_str());
+			if(resizeMode==2)
+			{
+				SendMessage(hSizeTotalAspect,EM_SETSEL,0,-1);
+				SendMessage(hSizeTotalAspect,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)(std::to_string(targetY)).c_str());
+			}
 		} else
 		{
 			SendMessage(hSizeXEdit,EM_SETSEL,0,-1);
@@ -1347,7 +1361,7 @@ LRESULT CALLBACK SizeDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
 			SendMessage(hSizeYEdit,EM_SETSEL,0,-1);
 			SendMessage(hSizeYEdit,EM_REPLACESEL,(WPARAM)FALSE,(LPARAM)(std::to_string((int)round(targetY))).c_str());
 		}
-		UpdateDialogues(resizeMode==2?true:false);
+		UpdateDialogues(resizeMode);
 		break;
 
 	case WM_CLOSE:
@@ -1364,6 +1378,7 @@ LRESULT CALLBACK SizeDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
 			switch(resizeMode)
 			{
 				case 2:
+				case 3:
 					GetWindowText(hSizeTotalEdit,xTextBox,1024);
 					GetWindowText(hSizeTotalAspect,yTextBox,1024);
 					break;
@@ -1382,30 +1397,9 @@ LRESULT CALLBACK SizeDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
 		}
 		if(HIWORD(wParam) == CBN_SELCHANGE)
 		{
-			int selIndex = SendMessage((HWND)lParam, CB_GETCURSEL, 0, 0);
+			resizeMode = SendMessage((HWND)lParam, CB_GETCURSEL, 0, 0);
 			
-			bool totalMode;
-			switch(selIndex)
-			{
-				case 0:
-					resizeMode = 0;
-					totalMode = false;
-					break;
-				case 1:
-					resizeMode = 1;
-					totalMode = false;
-					break;
-				case 2:
-					resizeMode = 2;
-					totalMode = true;
-					break;
-				default:
-					resizeMode = 0;
-					totalMode = false;
-					break;
-			}
-			
-			UpdateDialogues(totalMode);
+			UpdateDialogues(resizeMode);
 		}
 		break;
 
@@ -1533,6 +1527,7 @@ void AddControlsSize(HWND hWnd)
 	SendMessage(hSizeComboBox, CB_ADDSTRING, 0, (LPARAM)TEXT("multipliers"));
 	SendMessage(hSizeComboBox, CB_ADDSTRING, 0, (LPARAM)TEXT("exact"));
 	SendMessage(hSizeComboBox, CB_ADDSTRING, 0, (LPARAM)TEXT("total"));
+	SendMessage(hSizeComboBox, CB_ADDSTRING, 0, (LPARAM)TEXT("total w/newlines"));
 	SendMessage(hSizeComboBox, CB_SETCURSEL, (WPARAM)0, 0);
 
 	hSizeXText = CreateWindow("static","X",WS_VISIBLE|WS_CHILD|ES_CENTER,15,45,50,25,hWnd,NULL,NULL,NULL);
