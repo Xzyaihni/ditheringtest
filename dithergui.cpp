@@ -1258,58 +1258,42 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 				
 				int yoff = remainderY>0?1:0;
 				
-				int smallImgSize = (height/4+yoff)*(width+remainderX)*3;
+				int smallImgSize = ((height/4)+yoff)*((width/2)+remainderX);
 				
-				//i say black and white to braille but it can take images of any color and just uses the first color channel and sees is it closer to black or white
+				//i say black and white to braille but it can take images of any color and just uses the first color channel and checks if its closer to black or white
 
 				boost::timer::cpu_timer timer;
 
-				int smallWidth = (width/2+remainderX);
+				int smallWidth = width/2;
 				
 				//MessageBox(NULL,("aaaaaaaaaaaaaaa: "+std::to_string((height))).c_str(),"B",0);
 				
 				int eap = 0;
-				for(unsigned char *p = pixels; p != pixels+smallImgSize; p += bpp*2, eap += bpp*2)
+
+				for(unsigned char *p = pixels; p != pixels+smallImgSize; p++, eap++)
 				{
-					int w = (eap/(bpp*2))%smallWidth;
+					int w = eap%smallWidth;
 					
-					int h = (eap/(bpp*2))/smallWidth;
+					int h = eap/smallWidth;
 					
 					std::bitset<8> blockNUM;
 
-					int bitVals[8];
+					int bitVals[8] = {0};
 
-					bitVals[0] = (*(p+(smallWidth*2*h*3*bpp))>127?0:1);
-					bitVals[3] = (*(p+bpp+(smallWidth*2*h*3*bpp))>127?0:1);
+					for(int y = 0; y < 4; y++)
+					{
+						for(int x = 0; x < 2; x++)
+						{
+							int positionOff = (w*2+x)*bpp+(h*4+y)*(smallWidth*2*bpp);
 
-					if(eap/(smallWidth*3)<(height/2))
-					{
-						bitVals[1] = (*(p+(smallWidth*2*(h*3+1)*bpp))>127?0:1);
-						bitVals[4] = (*(p+bpp+(smallWidth*2*(h*3+1)*bpp))>127?0:1);
-					} else
-					{
-						bitVals[1] = 0;
-						bitVals[4] = 0;
-					}
-						
-					if(eap/(smallWidth*3)<(height/2-1))
-					{
-						bitVals[2] = (*(p+(smallWidth*2*(h*3+2)*bpp))>127?0:1);
-						bitVals[5] = (*(p+bpp+(smallWidth*2*(h*3+2)*bpp))>127?0:1);
-					} else
-					{
-						bitVals[2] = 0;
-						bitVals[5] = 0;
-					}
-						
-					if(eap/(smallWidth*3)<(height/2-2))
-					{
-						bitVals[6] = (*(p+(smallWidth*2*(h*3+3)*bpp))>127?0:1);
-						bitVals[7] = (*(p+bpp+(smallWidth*2*(h*3+3)*bpp))>127?0:1);
-					} else
-					{
-						bitVals[6] = 0;
-						bitVals[7] = 0;
+							int bitPos = y==3 ? 6+x : y+x*3;
+
+							bitVals[bitPos] = 0;
+							if(!(((w+1)*2)>width | ((h+1)*4)>height))
+							{
+								bitVals[bitPos] = (*(pixels+positionOff)>127?0:1);
+							}
+						}
 					}
 					
 					blockNUM.set(0,bitVals[0]);
@@ -1322,7 +1306,6 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 					blockNUM.set(7,bitVals[7]);
 					
 					filestream << (wchar_t)(0x2800+blockNUM.to_ulong());
-					
 					//MessageBox(NULL,(std::to_string(w)+std::to_string((width/2+remainderX)-1)).c_str(),"a",0);
 					if(w==(smallWidth-1))
 					{
