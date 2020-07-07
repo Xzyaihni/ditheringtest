@@ -1253,12 +1253,9 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 				
 				filestream.imbue(std::locale(filestream.getloc(), new std::codecvt_utf8_utf16<wchar_t>));
 				
-				int remainderY = height % 4;
 				int remainderX = width % 2;
 				
-				int yoff = remainderY>0?1:0;
-				
-				int smallImgSize = ((height/4)+yoff)*((width/2)+remainderX);
+				int smallImgSize = (height/4)*(width/2);
 				
 				//i say black and white to braille but it can take images of any color and just uses the first color channel and checks if its closer to black or white
 
@@ -1284,7 +1281,7 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 					{
 						for(int x = 0; x < 2; x++)
 						{
-							int positionOff = (w*2+x)*bpp+(h*4+y)*(smallWidth*2*bpp);
+							int positionOff = (w*2+x)*bpp+(h*4+y)*((smallWidth*2+remainderX)*bpp);
 
 							int bitPos = y==3 ? 6+x : y+x*3;
 
