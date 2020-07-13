@@ -551,7 +551,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 							avgImageColor[i]/=pixel_amount;
 							colorMultiply[i]=multiplyScale+(avgColor[i]/avgImageColor[i])*(1-multiplyScale);
 						}
-						
 						for(unsigned char *p = image, *po = output_image; p != image+image_size; p += bpp, po += colors)
 						{
 							int t = 1;
@@ -578,8 +577,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 
 						stbi_image_free(image_unres);
-						unsigned char *save_image = dither_image(output_image,width,height,bpp,color_pallete,width,height,color_mode,transparency);
-						stbi_write_png((outputPATH.string()+".png").c_str(), width, height, colors, save_image, width * colors);
+						unsigned char *save_image = dither_image(output_image,width,height,bpp,color_pallete,newWidth,newHeight,color_mode,transparency);
+						stbi_write_png((outputPATH.string()+".png").c_str(), newWidth, newHeight, colors, save_image, newWidth * colors);
 
 						delete[] save_image;
 					} else
