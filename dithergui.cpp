@@ -205,6 +205,8 @@ void UpdateColorList()
 		fullSTR += std::to_string(color_pallete[i][1]);
 		fullSTR += " ";
 		fullSTR += std::to_string(color_pallete[i][2]);
+		
+		SendMessage(hColorList,LB_ADDSTRING,0,(LPARAM)fullSTR.c_str());
 	}
 }
 
@@ -503,9 +505,10 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						float colorAmount = color_pallete.size();
 						for(int i = 0; i < colorAmount; i++)
 						{
-							avgColor[0]+=color_pallete[i][0]/colorAmount;
-							avgColor[1]+=color_pallete[i][1]/colorAmount;
-							avgColor[2]+=color_pallete[i][2]/colorAmount;
+							for(int k = 0; k < 3; k++)
+							{
+								avgColor[k]+=color_pallete[i][k]/colorAmount;
+							}
 						}
 
 						int width,height,bpp;
@@ -543,13 +546,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 							avgImageColor[2]+=(*(p+2))*t;
 						}
 
-						avgImageColor[0]/=pixel_amount;
-						avgImageColor[1]/=pixel_amount;
-						avgImageColor[2]/=pixel_amount;
-
-						colorMultiply[0]=multiplyScale+(avgColor[0]/avgImageColor[0])*(1-multiplyScale);
-						colorMultiply[1]=multiplyScale+(avgColor[1]/avgImageColor[1])*(1-multiplyScale);
-						colorMultiply[2]=multiplyScale+(avgColor[2]/avgImageColor[2])*(1-multiplyScale);
+						for(int i = 0; i < 3; i++)
+						{
+							avgImageColor[i]/=pixel_amount;
+							colorMultiply[i]=multiplyScale+(avgColor[i]/avgImageColor[i])*(1-multiplyScale);
+						}
 						
 						for(unsigned char *p = image, *po = output_image; p != image+image_size; p += bpp, po += colors)
 						{
