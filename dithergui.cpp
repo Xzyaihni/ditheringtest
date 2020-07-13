@@ -515,8 +515,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 						unsigned char *image_unres = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
 
-						int colors = 3 + transparency;
-
 						size_t image_size = newWidth * newHeight * bpp;
 
 						unsigned char *image = (unsigned char*)malloc(image_size);
@@ -526,7 +524,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						width = newWidth;
 						height = newHeight;
 
-						size_t output_size = width * height * colors;
+						size_t output_size = width * height * bpp;
 
 						size_t pixel_amount = width*height;
 
@@ -551,26 +549,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 							avgImageColor[i]/=pixel_amount;
 							colorMultiply[i]=multiplyScale+(avgColor[i]/avgImageColor[i])*(1-multiplyScale);
 						}
-						for(unsigned char *p = image, *po = output_image; p != image+image_size; p += bpp, po += colors)
+						for(unsigned char *p = image, *po = output_image; p != image+image_size; p += bpp, po += bpp)
 						{
 							int t = 1;
 
 							int color[3];
 
-							if(bpp==4)
-							{
-								t = (*(p+3))/255.0;
-							}
-							color[0] = std::round(((*p)*colorMultiply[0]) > 255 ? 255 : ((*p)*colorMultiply[0]))*t;
-							color[1] = std::round(((*(p+1))*colorMultiply[1]) > 255 ? 255 : ((*(p+1))*colorMultiply[1]))*t;
-							color[2] = std::round(((*(p+2))*colorMultiply[2]) > 255 ? 255 : ((*(p+2))*colorMultiply[2]))*t;
+							color[0] = std::round(((*p)*colorMultiply[0]) > 255 ? 255 : ((*p)*colorMultiply[0]));
+							color[1] = std::round(((*(p+1))*colorMultiply[1]) > 255 ? 255 : ((*(p+1))*colorMultiply[1]));
+							color[2] = std::round(((*(p+2))*colorMultiply[2]) > 255 ? 255 : ((*(p+2))*colorMultiply[2]));
 
 							*po = (uint8_t)color[0];
 							*(po+1) = (uint8_t)color[1];
 							*(po+2) = (uint8_t)color[2];
-							if(transparency==1)
+							if(bpp==4)
 							{
-								*(po+3) = *(p+3)==255?255:0;
+								*(po+3) = *(p+3);
 							}
 						}
 
@@ -578,7 +572,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 						stbi_image_free(image_unres);
 						unsigned char *save_image = dither_image(output_image,width,height,bpp,color_pallete,newWidth,newHeight,color_mode,transparency);
-						stbi_write_png((outputPATH.string()+".png").c_str(), newWidth, newHeight, colors, save_image, newWidth * colors);
+						stbi_write_png((outputPATH.string()+".png").c_str(), newWidth, newHeight, 3+transparency, save_image, newWidth * (3+transparency));
 
 						delete[] save_image;
 					} else
