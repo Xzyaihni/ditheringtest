@@ -109,8 +109,6 @@ COLORREF TACColor;
 
 COLORREF splitMergeColor;
 
-static HBRUSH hBrush;
-
 int selItem;
 int TACSelItem;
 int selItemSplit;
@@ -160,19 +158,8 @@ inline bool isBiggerThan(std::array<int,3> c1, std::array<int,3> c2)
 
 void QuickSort(int start, int end, std::vector<std::array<int,3>>& colorList)
 {
-	/*
-	MessageBox(NULL,("SORT FROM " + std::to_string(start) + " TO " + std::to_string(end)).c_str(),"0",0);
-	std::string str0;
-	for(int i = 0; i < colorList.size(); i++)
-	{
-		str0+=std::to_string(colorList[i][0])+" "+std::to_string(colorList[i][1])+" "+std::to_string(colorList[i][2])+"\n";
-	}
-	MessageBox(NULL,(str0).c_str(),"0",0);
-	*/
 	if(end-start>1)
 	{
-		bool swapped = false;
-
 		int i = start-1;
 		for(int j = start; j < end; j++)
 		{
@@ -180,7 +167,6 @@ void QuickSort(int start, int end, std::vector<std::array<int,3>>& colorList)
 			{
 				i++;
 				std::iter_swap(colorList.begin()+i, colorList.begin()+j);
-				swapped = true;
 			}
 		}
 		
@@ -211,7 +197,7 @@ void QuickSort(int start, int end, std::vector<std::array<int,3>>& colorList)
 void UpdateColorList()
 {
 	SendMessage(hColorList,LB_RESETCONTENT,0,0);
-	for(int i = 0; i < color_pallete.size(); i++)
+	for(unsigned int i = 0; i < color_pallete.size(); i++)
 	{
 		std::string fullSTR;
 		fullSTR += std::to_string(color_pallete[i][0]);
@@ -219,8 +205,6 @@ void UpdateColorList()
 		fullSTR += std::to_string(color_pallete[i][1]);
 		fullSTR += " ";
 		fullSTR += std::to_string(color_pallete[i][2]);
-
-		int pos = (int)SendMessage(hColorList, LB_ADDSTRING, 0, (LPARAM)fullSTR.c_str());
 	}
 }
 
@@ -430,16 +414,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						return 0;
 					}
 
-					float scaleX;
-					float scaleY;
+					int newWidth;
+					int newHeight;
 
 					int width, height;
 					stbi_load(inputPATH.string().c_str(), &width, &height, NULL, 0);
 
 					if(resizeMode==0)
 					{
-						scaleX = targetX;
-						scaleY = targetY;
+						newWidth = round(width*targetX);
+						newHeight = round(height*targetY);
 					}
 
 					if(resizeMode==1)
@@ -448,26 +432,26 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						{
 							if(targetX==targetY)
 							{
-								scaleX = 1;
-								scaleY = 1;
+								newWidth = width;
+								newHeight = height;
 							}
 							float ratio;
 							if(targetY==-1)
 							{
 								ratio = (float)width/height;
-								scaleX = targetX/width;
-								scaleY = (targetX/ratio)/height;
+								newWidth = targetX;
+								newHeight = (targetX/ratio);
 							}
 							if(targetX==-1)
 							{
 								ratio = (float)height/width;
-								scaleY = targetY/height;
-								scaleX = (targetY/ratio)/width;
+								newWidth = targetY;
+								newHeight = (targetY/ratio);
 							}
 						} else
 						{
-							scaleX = targetX / width;
-							scaleY = targetY / height;
+							newWidth = targetX;
+							newHeight = targetY;
 						}
 					}
 
@@ -476,13 +460,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						float mul = std::sqrt(targetX/(width*height));
 						if(targetY<1)
 						{
-							scaleX = mul*(1/targetY);
-							scaleY = mul*(targetY);
+							newWidth = width*(mul*(1/targetY));
+							newHeight = height*(mul*(targetY));
 						} else
 						{
 							float newTarget = 1-(targetY-1);
-							scaleX = mul*(newTarget);
-							scaleY = mul*(1/newTarget);
+							newWidth = width*(mul*(newTarget));
+							newHeight = height*(mul*(1/newTarget));
 						}
 					}
 
@@ -492,20 +476,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						long a = width*height;
 						double discriminant = std::sqrt(std::pow(b,2)-4*a*(-targetX+2));
 						float x2 = (float)(b-discriminant)/(2*a);
-						scaleX = std::abs(x2);
-						scaleY = scaleX;
+						newWidth = width*(std::abs(x2));
+						newHeight = height*(std::abs(x2));
 					}
 
 					
 
-					if(resizeMode==2 && (round((float)width * scaleX) * round((float)height * scaleY))>targetX)
+					if(resizeMode==2 && (newWidth * newHeight)>targetX)
 					{
-						if(scaleX>scaleY)
+						if(newWidth>newHeight)
 						{
-							scaleX = (round((float)width * scaleX)-1)/(float)width;
+							newWidth--;
 						} else
 						{
-							scaleY = (round((float)height * scaleY)-1)/(float)height;
+							newHeight--;
 						}
 					}
 
@@ -513,7 +497,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					{
 						float multiplyScale = SendMessage(hHueTrack,TBM_GETPOS,0,0)/100.0;
 
-						std::string convertedInputString = (currentPATH / "output" / inputPATH.filename().stem()).string()+"CONVERTED.png";
 						std::array<float, 3> avgColor = {0,0,0};
 						std::array<float, 3> avgImageColor = {0,0,0};
 						std::array<float, 3> colorMultiply = {0,0,0};
@@ -526,26 +509,19 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 						}
 
 						int width,height,bpp;
-						int widthR, heightR;
-
-						int colors = 3;
-						colors += transparency;
 
 						unsigned char *image_unres = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
 
-						size_t image_unres_size = width * height * bpp;
+						int colors = 3 + transparency;
 
-						widthR = round((float)width * scaleX);
-						heightR = round((float)height * scaleY);
-
-						size_t image_size = widthR * heightR * bpp;
+						size_t image_size = newWidth * newHeight * bpp;
 
 						unsigned char *image = (unsigned char*)malloc(image_size);
 
-						stbir_resize_uint8(image_unres, width, height, 0, image, widthR, heightR, 0, bpp);
+						stbir_resize_uint8(image_unres, width, height, 0, image, newWidth, newHeight, 0, bpp);
 
-						width = widthR;
-						height = heightR;
+						width = newWidth;
+						height = newHeight;
 
 						size_t output_size = width * height * colors;
 
@@ -598,17 +574,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 							}
 						}
 
-						stbi_write_png(convertedInputString.c_str(), width, height, colors, output_image, width * colors);
-						
-						stbi_image_free(image_unres);
 
-						dither_image(convertedInputString,(outputPATH.string()+".png"),color_pallete,1,1,color_mode,0,transparency);
+
+						stbi_image_free(image_unres);
+						unsigned char *save_image = dither_image(output_image,width,height,bpp,color_pallete,width,height,color_mode,transparency);
+						stbi_write_png((outputPATH.string()+".png").c_str(), width, height, colors, save_image, width * colors);
+
+						delete[] save_image;
 					} else
 					{
-						//MessageBox(NULL,std::to_string(resizeMode).c_str(),"mode",0);
-						//MessageBox(NULL,std::to_string(scaleX).c_str(),"X",0);
-						//MessageBox(NULL,std::to_string(scaleY).c_str(),"Y",0);
-					dither_image(inputPATH.string(),(outputPATH.string()+".png"),color_pallete,scaleX,scaleY,color_mode,0,transparency);
+						dither_image(inputPATH.string(),(outputPATH.string()+".png"),color_pallete,newWidth,newHeight,color_mode,transparency);
 					}
 				} else
 				{
@@ -785,8 +760,9 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 
 				SetDCBrushColor(lpdis->hDC,RGB(rgbDarkColor.r,rgbDarkColor.g,rgbDarkColor.b));
 				SetBkMode(lpdis->hDC, TRANSPARENT);
-				hFont = (HFONT)GetStockObject(SYSTEM_FONT); 
-				if (hOldFont = (HFONT)SelectObject(lpdis->hDC, hFont))
+				hFont = (HFONT)GetStockObject(SYSTEM_FONT);
+				hOldFont = (HFONT)SelectObject(lpdis->hDC, hFont);
+				if (hOldFont)
 				{
 					//last variable is string length
 					TextOut(lpdis->hDC, 20, 5, "select merge color", 18); 
@@ -835,7 +811,7 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 					fullSTR += std::to_string(color[2]);
 
 					int pos = 0;
-					for(int i = 0; i < split_color_group.size(); i++)
+					for(unsigned int i = 0; i < split_color_group.size(); i++)
 					{
 						if(!isBiggerThan(color,split_color_group[i]))
 						{
@@ -865,7 +841,7 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 					fullSTR += std::to_string(color[2]);
 
 					int pos = 0;
-					for(int i = 0; i < split_color_pallete.size(); i++)
+					for(unsigned int i = 0; i < split_color_pallete.size(); i++)
 					{
 						if(!isBiggerThan(color,split_color_pallete[i]))
 						{
@@ -934,7 +910,7 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 				{
 					int match = 0;
 
-					for(int i = 0; i < split_color_group.size(); i++)
+					for(unsigned int i = 0; i < split_color_group.size(); i++)
 					{
 						bool check = true;
 						if(bpp==4)
@@ -990,7 +966,7 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 
 				SendMessage(hSplitColorList,LB_RESETCONTENT,0,0);
 				SendMessage(hSplitColorGroupList,LB_RESETCONTENT,0,0);
-				for(int i = 0; i < split_color_pallete.size(); i++)
+				for(unsigned int i = 0; i < split_color_pallete.size(); i++)
 				{
 					std::string fullSTR;
 					fullSTR += std::to_string(split_color_pallete[i][0]);
@@ -998,8 +974,6 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 					fullSTR += std::to_string(split_color_pallete[i][1]);
 					fullSTR += " ";
 					fullSTR += std::to_string(split_color_pallete[i][2]);
-
-					int pos = (int)SendMessage(hSplitColorList, LB_ADDSTRING, 0, (LPARAM)fullSTR.c_str());
 				}
 			}
 		break;
@@ -1076,7 +1050,7 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				{
 					int w = (eap/bpp)%width;
 					
-					for(int i = 0; i < color_stringPairs.size(); i++)
+					for(unsigned int i = 0; i < color_stringPairs.size(); i++)
 					{
 						std::array<int,3> color = color_stringPairs[i].color;
 						
@@ -1112,7 +1086,7 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				std::vector<std::array<int,3>> pallete = GetPallete(inputPATH.string());
 				QuickSort(0,pallete.size()-1,pallete);
 				
-				for(int i = 0; i < pallete.size(); i++)
+				for(unsigned int i = 0; i < pallete.size(); i++)
 				{
 					colorTextPair pair;
 					pair.color = pallete[i];
@@ -1121,7 +1095,7 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				}
 				
 				SendMessage(hPixelInfoList,LB_RESETCONTENT,0,0);
-				for(int i = 0; i < color_stringPairs.size(); i++)
+				for(unsigned int i = 0; i < color_stringPairs.size(); i++)
 				{
 					std::string fullSTR;
 					fullSTR += std::to_string(color_stringPairs[i].color[0]);
@@ -1129,8 +1103,6 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 					fullSTR += std::to_string(color_stringPairs[i].color[1]);
 					fullSTR += " ";
 					fullSTR += std::to_string(color_stringPairs[i].color[2]);
-					
-					int pos = (int)SendMessage(hPixelInfoList, LB_ADDSTRING, 0, (LPARAM)fullSTR.c_str());
 				}
 			}
 			break;
@@ -1189,7 +1161,7 @@ LRESULT CALLBACK TacDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 				GetGValue(TACColor),
 				GetBValue(TACColor)};
 				
-				for(int i = 0; i < color_stringPairs.size(); i++)
+				for(unsigned int i = 0; i < color_stringPairs.size(); i++)
 				{
 					if(color_stringPairs[i].color==color)
 					{
@@ -1241,7 +1213,6 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 				}
 				
 				unsigned char *pixels = stbi_load(inputPATH.string().c_str(), &width, &height, &bpp, 0);
-				size_t image_size = width * height * bpp;
 
 				boost::filesystem::path outputPATH = currentPATH / "output" / inputPATH.filename().stem();
 				
@@ -1585,7 +1556,7 @@ void AddControlsTAC(HWND hWnd)
 
 	int prevIndex;
 
-	for(int i = 0; i < color_stringPairs.size(); i++)
+	for(unsigned int i = 0; i < color_stringPairs.size(); i++)
 	{
 		if(color_stringPairs[i].color==color)
 		{
@@ -1756,7 +1727,7 @@ bool AddColor(HWND hWnd, DWORD defColor)
 	if(position==color_pallete.end())
 	{
 		int pos = 0;
-		for(int i = 0; i < color_pallete.size(); i++)
+		for(unsigned int i = 0; i < color_pallete.size(); i++)
 		{
 			if(!isBiggerThan(color,color_pallete[i]))
 			{

@@ -13,36 +13,33 @@
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include "stb_image_resize.h"
 
+#include <windows.h>
+
 using namespace std;
 
-void dither_image(string filename, string filename_o, vector<array<int,3>> pallete_arr, float scaleX = 1, float scaleY = 1, int color_model = 0, int fformat = 0, int transparency = 0)
+unsigned char* dither_image(unsigned char *image_unres, int width, int height, int bpp, vector<array<int,3>> pallete_arr, int newWidth, int newHeight, int color_model, bool transparency)
 {
-	int width, height, bpp;
-	int widthR, heightR;
+	int colors = 3 + transparency;
 	
-	int colors = 3;
-	colors += transparency;
-	
-	unsigned char *image_unres = stbi_load(filename.c_str(), &width, &height, &bpp, 0);
-	
-	size_t image_unres_size = width * height * bpp;
-	
-	widthR = round((float)width * scaleX);
-	heightR = round((float)height * scaleY);
-	
-	size_t image_size = widthR * heightR * bpp;
-	
+	size_t image_size = newWidth * newHeight * bpp;
+
 	unsigned char *image = (unsigned char*)malloc(image_size);
+
+	if(width!=newWidth || height!=newHeight)
+	{
+		stbir_resize_uint8(image_unres, width, height, 0, image, newWidth, newHeight, 0, bpp);
 	
-	stbir_resize_uint8(image_unres, width, height, 0, image, widthR, heightR, 0, bpp);
-	
-	width = widthR;
-	height = heightR;
+		width = newWidth;
+		height = newHeight;
+	} else
+	{
+		image = image_unres;
+	}
 	
 	size_t output_size = width * height * colors;
-	
-	unsigned char *output_image = (unsigned char*)malloc(output_size);
-	
+
+	unsigned char *output_image = new unsigned char[output_size];
+
 	int error_clrs = 3;
 	
 	int ***errors = new int**[width];
@@ -60,7 +57,7 @@ void dither_image(string filename, string filename_o, vector<array<int,3>> palle
 	}
 	
 	int eap = 0;
-	
+
 	for(unsigned char *p = image, *po = output_image; p != image+image_size; p += bpp, po += colors, eap += colors)
 	{
 		float t = 1;
@@ -86,7 +83,7 @@ void dither_image(string filename, string filename_o, vector<array<int,3>> palle
 		color[1] = color[1]+errors[w][h][1];
 		color[2] = color[2]+errors[w][h][2];
 		
-		for(int i = 0; i < pallete_arr.size(); i++)
+		for(unsigned int i = 0; i < pallete_arr.size(); i++)
 		{
 			float distance;
 			if (color_model == 0)
@@ -135,7 +132,6 @@ void dither_image(string filename, string filename_o, vector<array<int,3>> palle
 		float error7[3];
 		float error5[3];
 		float error3[3];
-		float error1[3];
 		
 		error7[0] = error[0]*7;
 		error7[1] = error[1]*7;
@@ -247,16 +243,33 @@ void dither_image(string filename, string filename_o, vector<array<int,3>> palle
 			*(po+3) = *(p+3)==255?255:0;
 		}
 	}
-	
+
 	delete[] errors;
+
+	return output_image;
+}
+
+void dither_image(string filename, string filename_o, vector<array<int,3>> pallete_arr, int newWidth, int newHeight, int color_model, bool transparency, bool fformat)
+{
+	int width, height, bpp;
 	
-	if(fformat==0)
+	unsigned char *image_unres = stbi_load(filename.c_str(), &width, &height, &bpp, 0);
+	
+	unsigned char *output_image = dither_image(image_unres, width, height, bpp, pallete_arr, newWidth, newHeight, color_model, transparency);
+
+	int colors = 3 + transparency;
+
+	if(!fformat)
 	{
-		stbi_write_png(filename_o.c_str(), width, height, colors, output_image, width * colors);
-	} else if(fformat==1)
+		stbi_write_png(filename_o.c_str(), newWidth, newHeight, colors, output_image, newWidth * colors);
+	} else
 	{
-		stbi_write_jpg(filename_o.c_str(), width, height, colors, output_image, 100);
+		stbi_write_jpg(filename_o.c_str(), newWidth, newHeight, colors, output_image, 100);
 	}
-	
+
 	stbi_image_free(image_unres);
+	if(image_unres!=output_image)
+	{
+		delete[] output_image;
+	}
 }

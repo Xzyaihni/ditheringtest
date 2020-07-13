@@ -1,6 +1,6 @@
 CXX = g++
 CXXFLAGS = -IC:/Users/Xzyaihni/Desktop/cppshit/dithering -IC:/boost_1_72_0 -LC:/boost_1_72_0/stage/lib
-LIBS = -lboost_timer-mgw81-mt-s-x32-1_72 -lboost_chrono-mgw81-mt-s-x32-1_72 -lboost_filesystem-mgw81-mt-s-x32-1_72 -lcomdlg32 -static-libgcc -static-libstdc++ -Wl,-Bstatic -lstdc++ -lpthread
+LIBS = -lboost_timer-mgw81-mt-s-x32-1_72 -lboost_chrono-mgw81-mt-s-x32-1_72 -lboost_filesystem-mgw81-mt-s-x32-1_72 -lcomdlg32 -static-libgcc -static-libstdc++ -Wall -Wl,-Bstatic -lstdc++ -lpthread
 
 all: dithergui
 
@@ -15,12 +15,6 @@ image_pallete.o: image_pallete.cpp
 	
 color_spaces.o: color_spaces.cpp
 	$(CXX) $(CXXFLAGS) -c color_spaces.cpp $(LIBS)
-
-separate.o: separate.cpp
-	$(CXX) $(CXXFLAGS) -c separate.cpp $(LIBS)
-	
-totext.o: totext.cpp
-	$(CXX) $(CXXFLAGS) -c totext.cpp $(LIBS)
 
 dithergui.o: dithergui.cpp
 	$(CXX) $(CXXFLAGS) -c dithergui.cpp $(LIBS)
