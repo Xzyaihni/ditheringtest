@@ -72,16 +72,16 @@ unsigned char* dither_image(unsigned char *image_unres, int width, int height, i
 		{
 			t = (*(p+3))/255.0;
 		}
-		color[0] = round((*p)*t);
-		color[1] = round((*(p+1))*t);
-		color[2] = round((*(p+2))*t);
 		
 		int h = (int)((eap/colors)/width);
 		int w = (eap/colors)%width;
 		
-		color[0] = color[0]+errors[w][h][0];
-		color[1] = color[1]+errors[w][h][1];
-		color[2] = color[2]+errors[w][h][2];
+		for(int i = 0; i < 3; i++)
+		{
+			color[i] = round((*(p+i))*t);
+			
+			color[i] = color[i]+errors[w][h][i];
+		}
 		
 		for(unsigned int i = 0; i < pallete_arr.size(); i++)
 		{
