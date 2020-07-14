@@ -2,9 +2,32 @@
 #include <cmath>
 #include "color_spaces.h"
 
-XYZ RGBtoXYZ(RGB color)
+#include <array>
+
+cRGB::cRGB():r(0),g(0),b(0) {}
+cRGB::cRGB(std::array<float,3> color):r(color[0]),g(color[1]),b(color[2]) {}
+std::array<float,3> cRGB::to_array()
 {
-	XYZ retCol;
+	return {this->r,this->g,this->b};
+}
+
+cXYZ::cXYZ():x(0),y(0),z(0) {}
+cXYZ::cXYZ(std::array<float,3> color):x(color[0]),y(color[1]),z(color[2]) {}
+std::array<float,3> cXYZ::to_array()
+{
+	return {this->x,this->y,this->z};
+}
+
+cLAB::cLAB():l(0),a(0),b(0) {}
+cLAB::cLAB(std::array<float,3> color):l(color[0]),a(color[1]),b(color[2]) {}
+std::array<float,3> cLAB::to_array()
+{
+	return {this->l,this->a,this->b};
+}
+
+cXYZ RGBtoXYZ(cRGB color)
+{
+	cXYZ retCol;
 
 	float nR = (float)color.r/255;
 	float nG = (float)color.g/255;
@@ -48,9 +71,9 @@ XYZ RGBtoXYZ(RGB color)
 	return retCol;
 }
 
-RGB XYZtoRGB(XYZ color)
+cRGB XYZtoRGB(cXYZ color)
 {
-	RGB retCol;
+	cRGB retCol;
 	float nX = color.x/100.0;
 	float nY = color.y/100.0;
 	float nZ = color.z/100.0;
@@ -93,9 +116,9 @@ RGB XYZtoRGB(XYZ color)
 	return retCol;
 }
 
-XYZ LABtoXYZ(LAB color)
+cXYZ LABtoXYZ(cLAB color)
 {
-	XYZ retCol;
+	cXYZ retCol;
 
 	float nY = (color.l+16)/116.0;
 	float nX = color.a/500.0+nY;
@@ -135,9 +158,9 @@ XYZ LABtoXYZ(LAB color)
 	return retCol;
 }
 
-LAB XYZtoLAB(XYZ color)
+cLAB XYZtoLAB(cXYZ color)
 {
-	LAB retCol;
+	cLAB retCol;
 
 	float nX = color.x/95.047f;
 	float nY = color.y/100.0f;
@@ -176,20 +199,3 @@ LAB XYZtoLAB(XYZ color)
 
 	return retCol;
 }
-/*
-int main()
-{
-	RGB color;
-
-	color.r = 255;
-	color.g = 128;
-	color.b = 66;
-
-	LAB newColor = XYZtoLAB(RGBtoXYZ(color));
-
-	std::cout << newColor.l << std::endl << newColor.a << std::endl << newColor.b << std::endl;
-
-	system("pause");
-
-	return 0;
-}*/

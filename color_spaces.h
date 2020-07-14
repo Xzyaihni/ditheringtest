@@ -1,33 +1,44 @@
 #ifndef COLOR_SPACES_H
 #define COLOR_SPACES_H
 
-class RGB
+#include <array>
+
+class cRGB
 {
 public:
-	int r;
-	int g;
-	int b;
+	cRGB();
+	cRGB(std::array<float,3>);
+	std::array<float,3> to_array();
+	float r;
+	float g;
+	float b;
 };
 
-class XYZ
+class cXYZ
 {
 public:
+	cXYZ();
+	cXYZ(std::array<float,3>);
+	std::array<float,3> to_array();
 	float x;
 	float y;
 	float z;
 };
 
-class LAB
+class cLAB
 {
 public:
+	cLAB();
+	cLAB(std::array<float,3>);
+	std::array<float,3> to_array();
 	float l;
 	float a;
 	float b;
 };
 
-XYZ RGBtoXYZ(RGB);
-RGB XYZtoRGB(XYZ);
-XYZ LABtoXYZ(LAB);
-LAB XYZtoLAB(XYZ);
+cXYZ RGBtoXYZ(cRGB);
+cRGB XYZtoRGB(cXYZ);
+cXYZ LABtoXYZ(cLAB);
+cLAB XYZtoLAB(cXYZ);
 
 #endif
