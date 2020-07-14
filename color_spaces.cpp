@@ -5,6 +5,7 @@
 #include <array>
 
 cRGB::cRGB():r(0),g(0),b(0) {}
+cRGB::cRGB(float r, float g, float b):r(r),g(g),b(b) {}
 cRGB::cRGB(std::array<float,3> color):r(color[0]),g(color[1]),b(color[2]) {}
 std::array<float,3> cRGB::to_array()
 {
@@ -12,6 +13,7 @@ std::array<float,3> cRGB::to_array()
 }
 
 cXYZ::cXYZ():x(0),y(0),z(0) {}
+cXYZ::cXYZ(float x, float y, float z):x(x),y(y),z(z) {}
 cXYZ::cXYZ(std::array<float,3> color):x(color[0]),y(color[1]),z(color[2]) {}
 std::array<float,3> cXYZ::to_array()
 {
@@ -19,6 +21,7 @@ std::array<float,3> cXYZ::to_array()
 }
 
 cLAB::cLAB():l(0),a(0),b(0) {}
+cLAB::cLAB(float l, float a, float b):l(l),a(a),b(b) {}
 cLAB::cLAB(std::array<float,3> color):l(color[0]),a(color[1]),b(color[2]) {}
 std::array<float,3> cLAB::to_array()
 {
