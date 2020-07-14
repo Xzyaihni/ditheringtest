@@ -65,7 +65,7 @@ unsigned char* dither_image(unsigned char *image_unres, int width, int height, i
 		int closestIndex = 0;
 		float closestDistance = -1;
 		
-		int color[3];
+		float color[3];
 		int closestColor[3];
 		
 		if(bpp==4)
@@ -92,19 +92,15 @@ unsigned char* dither_image(unsigned char *image_unres, int width, int height, i
 			}
 			else
 			{
-				RGB tempRGB;
+				cRGB tempRGB({color[0],color[1],color[2]});
 
-				tempRGB.r = color[0];
-				tempRGB.g = color[1];
-				tempRGB.b = color[2];
-
-				LAB LABColor = XYZtoLAB(RGBtoXYZ(tempRGB));
+				cLAB LABColor = XYZtoLAB(RGBtoXYZ(tempRGB));
 
 				tempRGB.r = pallete_arr[i][0];
 				tempRGB.g = pallete_arr[i][1];
 				tempRGB.b = pallete_arr[i][2];
 
-				LAB PLABColor = XYZtoLAB(RGBtoXYZ(tempRGB));
+				cLAB PLABColor = XYZtoLAB(RGBtoXYZ(tempRGB));
 
 				distance = abs(PLABColor.l - LABColor.l) + abs(PLABColor.a - LABColor.a) + abs(PLABColor.b - LABColor.b);
 			}
@@ -119,31 +115,11 @@ unsigned char* dither_image(unsigned char *image_unres, int width, int height, i
 			}
 		}
 		
-		closestColor[0] = pallete_arr[closestIndex][0];
-		closestColor[1] = pallete_arr[closestIndex][1];
-		closestColor[2] = pallete_arr[closestIndex][2];
-		
 		float error[3];
 		float part = 48;
-		error[0] = (color[0]-closestColor[0])/part;
-		error[1] = (color[1]-closestColor[1])/part;
-		error[2] = (color[2]-closestColor[2])/part;
-		
 		float error7[3];
 		float error5[3];
 		float error3[3];
-		
-		error7[0] = error[0]*7;
-		error7[1] = error[1]*7;
-		error7[2] = error[2]*7;
-		
-		error5[0] = error[0]*5;
-		error5[1] = error[1]*5;
-		error5[2] = error[2]*5;
-		
-		error3[0] = error[0]*3;
-		error3[1] = error[1]*3;
-		error3[2] = error[2]*3;
 		
 		bool right1 = w<(width-1);
 		bool right2 = w<(width-2);
@@ -152,92 +128,77 @@ unsigned char* dither_image(unsigned char *image_unres, int width, int height, i
 		bool left1 = w>0;
 		bool left2 = w>1;
 		
-		if(right1)
+		for(int i = 0; i <  3; i++)
 		{
-			errors[w+1][h][0] += error7[0];
-			errors[w+1][h][1] += error7[1];
-			errors[w+1][h][2] += error7[2];
+			closestColor[i] = pallete_arr[closestIndex][i];
+			
+			error[i] = (color[i]-closestColor[i])/part;
+			error7[i] = error[i]*7;
+			error5[i] = error[i]*5;
+			error3[i] = error[i]*3;
+			
+			if(right1)
+			{
+				errors[w+1][h][i] += error7[i];
+				if(down1)
+				{
+					errors[w+1][h+1][i] += error5[i];
+				}
+				if(down2)
+				{
+					errors[w+1][h+2][i] += error3[i];
+				}
+			}
+			
+			if(right2)
+			{
+				errors[w+2][h][i] += error5[i];
+				if(down1)
+				{
+					errors[w+2][h+1][i] += error3[i];
+				}
+				if(down2)
+				{
+					errors[w+2][h+2][i] += error[i];
+				}
+			}
+			
 			if(down1)
 			{
-				errors[w+1][h+1][0] += error5[0];
-				errors[w+1][h+1][1] += error5[1];
-				errors[w+1][h+1][2] += error5[2];
+				errors[w][h+1][i] += error7[i];
 			}
 			if(down2)
 			{
-				errors[w+1][h+2][0] += error3[0];
-				errors[w+1][h+2][1] += error3[1];
-				errors[w+1][h+2][2] += error3[2];
+				errors[w][h+2][i] += error5[i];
 			}
-		}
-		
-		if(right2)
-		{
-			errors[w+2][h][0] += error5[0];
-			errors[w+2][h][1] += error5[1];
-			errors[w+2][h][2] += error5[2];
-			if(down1)
+			
+			if(left1)
 			{
-				errors[w+2][h+1][0] += error3[0];
-				errors[w+2][h+1][1] += error3[1];
-				errors[w+2][h+1][2] += error3[2];
+				if(down1)
+				{
+					errors[w-1][h+1][i] += error5[i];
+				}
+				if(down2)
+				{
+					errors[w-1][h+2][i] += error3[i];
+				}
 			}
-			if(down2)
+			
+			if(left2)
 			{
-				errors[w+2][h+2][0] += error[0];
-				errors[w+2][h+2][1] += error[1];
-				errors[w+2][h+2][2] += error[2];
+				if(down1)
+				{
+					errors[w-2][h+1][i] += error3[i];
+				}
+				if(down2)
+				{
+					errors[w-2][h+2][i] += error[i];
+				}
 			}
+			
+			*(po+i) = (uint8_t)closestColor[i];
+			
 		}
-		
-		if(down1)
-		{
-			errors[w][h+1][0] += error7[0];
-			errors[w][h+1][1] += error7[1];
-			errors[w][h+1][2] += error7[2];
-		}
-		if(down2)
-		{
-			errors[w][h+2][0] += error5[0];
-			errors[w][h+2][1] += error5[1];
-			errors[w][h+2][2] += error5[2];
-		}
-		
-		if(left1)
-		{
-			if(down1)
-			{
-				errors[w-1][h+1][0] += error5[0];
-				errors[w-1][h+1][1] += error5[1];
-				errors[w-1][h+1][2] += error5[2];
-			}
-			if(down2)
-			{
-				errors[w-1][h+2][0] += error3[0];
-				errors[w-1][h+2][1] += error3[1];
-				errors[w-1][h+2][2] += error3[2];
-			}
-		}
-		
-		if(left2)
-		{
-			if(down1)
-			{
-				errors[w-2][h+1][0] += error3[0];
-				errors[w-2][h+1][1] += error3[1];
-				errors[w-2][h+1][2] += error3[2];
-			}
-			if(down2)
-			{
-				errors[w-2][h+2][0] += error[0];
-				errors[w-2][h+2][1] += error[1];
-				errors[w-2][h+2][2] += error[2];
-			}
-		}
-		
-		*po = (uint8_t)closestColor[0];
-		*(po+1) = (uint8_t)closestColor[1];
-		*(po+2) = (uint8_t)closestColor[2];
 		if(transparency==1)
 		{
 			*(po+3) = *(p+3)==255?255:0;
