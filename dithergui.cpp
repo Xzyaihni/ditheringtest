@@ -1,5 +1,4 @@
 #include <iostream>
-#include <fstream>
 #include <vector>
 #include <cmath>
 #include <string>
@@ -9,7 +8,6 @@
 #include <codecvt>
 #include <iomanip>
 #include <sstream>
-#include <bitset>
 
 #include <io.h>
 #include <fcntl.h>
@@ -20,6 +18,7 @@
 #include "dither.h"
 #include "image_pallete.h"
 #include "color_spaces.h"
+#include "to_braille.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/dll.hpp>
@@ -1273,69 +1272,10 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 				
 				std::string filepath = (outputPATH.string()+".txt");
 				
-				std::wofstream filestream(filepath.c_str());
-				
-				filestream.imbue(std::locale(filestream.getloc(), new std::codecvt_utf8_utf16<wchar_t>));
-				
-				int remainderX = width % 2;
-				
-				int smallImgSize = (height/4)*(width/2);
-				
-				//i say black and white to braille but it can take images of any color and just uses the first color channel and checks if its closer to black or white
-
 				boost::timer::cpu_timer timer;
 
-				int smallWidth = width/2;
+				to_braille(pixels,width,height,bpp,filepath);
 				
-				//MessageBox(NULL,("aaaaaaaaaaaaaaa: "+std::to_string((height))).c_str(),"B",0);
-				
-				int eap = 0;
-
-				for(unsigned char *p = pixels; p != pixels+smallImgSize; p++, eap++)
-				{
-					int w = eap%smallWidth;
-					
-					int h = eap/smallWidth;
-					
-					std::bitset<8> blockNUM;
-
-					int bitVals[8] = {0};
-
-					for(int y = 0; y < 4; y++)
-					{
-						for(int x = 0; x < 2; x++)
-						{
-							int positionOff = (w*2+x)*bpp+(h*4+y)*((smallWidth*2+remainderX)*bpp);
-
-							int bitPos = y==3 ? 6+x : y+x*3;
-
-							bitVals[bitPos] = 0;
-							if(!(((w+1)*2)>width | ((h+1)*4)>height))
-							{
-								bitVals[bitPos] = (*(pixels+positionOff)>127?0:1);
-							}
-						}
-					}
-					
-					blockNUM.set(0,bitVals[0]);
-					blockNUM.set(1,bitVals[1]);
-					blockNUM.set(2,bitVals[2]);
-					blockNUM.set(3,bitVals[3]);
-					blockNUM.set(4,bitVals[4]);
-					blockNUM.set(5,bitVals[5]);
-					blockNUM.set(6,bitVals[6]);
-					blockNUM.set(7,bitVals[7]);
-					
-					filestream << (wchar_t)(0x2800+blockNUM.to_ulong());
-					//MessageBox(NULL,(std::to_string(w)+std::to_string((width/2+remainderX)-1)).c_str(),"a",0);
-					if(w==(smallWidth-1))
-					{
-						//MessageBox(NULL,"aaaaaaaaaaaaaaaaaaaa","B",0);
-						filestream << "\n";
-					}
-				}
-				
-				filestream.close();
 				stbi_image_free(pixels);
 				
 				std::string finish_message;

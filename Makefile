@@ -15,9 +15,12 @@ image_pallete.o: image_pallete.cpp
 	
 color_spaces.o: color_spaces.cpp
 	$(CXX) $(CXXFLAGS) -c color_spaces.cpp $(LIBS)
+	
+to_braille.o: to_braille.cpp
+	$(CXX) $(CXXFLAGS) -c to_braille.cpp $(LIBS)
 
 dithergui.o: dithergui.cpp
 	$(CXX) $(CXXFLAGS) -c dithergui.cpp $(LIBS)
 	
 dithergui: dithergui.o dither.o  image_pallete.o color_spaces.o
-	$(CXX) $(CXXFLAGS) dithergui.o dither.o image_pallete.o color_spaces.o -o build/dithergui $(LIBS) -mwindows
+	$(CXX) $(CXXFLAGS) dithergui.o dither.o image_pallete.o color_spaces.o to_braille.o -o build/dithergui $(LIBS) -mwindows
