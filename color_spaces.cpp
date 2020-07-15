@@ -1,8 +1,5 @@
-#include <iostream>
 #include <cmath>
 #include "color_spaces.h"
-
-#include <array>
 
 cRGB::cRGB():r(0),g(0),b(0) {}
 cRGB::cRGB(float r, float g, float b):r(r),g(g),b(b) {}
@@ -28,13 +25,13 @@ std::array<float,3> cLAB::to_array()
 	return {this->l,this->a,this->b};
 }
 
-cXYZ RGBtoXYZ(cRGB color)
+cXYZ cRGB::toXYZ()
 {
 	cXYZ retCol;
 
-	float nR = (float)color.r/255;
-	float nG = (float)color.g/255;
-	float nB = (float)color.b/255;
+	float nR = (float)this->r/255;
+	float nG = (float)this->g/255;
+	float nB = (float)this->b/255;
 
 	if (nR > 0.04045f)
 	{
@@ -74,12 +71,13 @@ cXYZ RGBtoXYZ(cRGB color)
 	return retCol;
 }
 
-cRGB XYZtoRGB(cXYZ color)
+cRGB cXYZ::toRGB()
 {
 	cRGB retCol;
-	float nX = color.x/100.0;
-	float nY = color.y/100.0;
-	float nZ = color.z/100.0;
+	
+	float nX = this->x/100.0;
+	float nY = this->y/100.0;
+	float nZ = this->z/100.0;
 	
 	float nR = nX*3.2406+nY*-1.5372+nZ*-0.4986;
 	float nG = nX*-0.9689+nY*1.8758+nZ*0.0415;
@@ -119,13 +117,13 @@ cRGB XYZtoRGB(cXYZ color)
 	return retCol;
 }
 
-cXYZ LABtoXYZ(cLAB color)
+cXYZ cLAB::toXYZ()
 {
 	cXYZ retCol;
 
-	float nY = (color.l+16)/116.0;
-	float nX = color.a/500.0+nY;
-	float nZ = nY-color.b/200.0;
+	float nY = (this->l+16)/116.0;
+	float nX = this->a/500.0+nY;
+	float nZ = nY-this->b/200.0;
 
 	if (std::pow(nY,3) > 0.008856)
 	{
@@ -161,13 +159,13 @@ cXYZ LABtoXYZ(cLAB color)
 	return retCol;
 }
 
-cLAB XYZtoLAB(cXYZ color)
+cLAB cXYZ::toLAB()
 {
 	cLAB retCol;
 
-	float nX = color.x/95.047f;
-	float nY = color.y/100.0f;
-	float nZ = color.z/108.883f;
+	float nX = this->x/95.047f;
+	float nY = this->y/100.0f;
+	float nZ = this->z/108.883f;
 
 	if (nX > 0.008856)
 	{

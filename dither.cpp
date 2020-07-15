@@ -92,17 +92,63 @@ unsigned char* dither_image(unsigned char *image_unres, int width, int height, i
 			}
 			else
 			{
-				cRGB tempRGB({color[0],color[1],color[2]});
+				float LABColors[6];
+				LABColors[0] = color[0];
+				LABColors[1] = color[1];
+				LABColors[2] = color[2];
+				LABColors[3] = pallete_arr[i][0];
+				LABColors[4] = pallete_arr[i][1];
+				LABColors[5] = pallete_arr[i][2];
+				
+				for(int k = 0; k < 6; k++)
+				{
+					LABColors[k] /= 255;
+					
+					if(LABColors[k] > 0.04045f)
+					{
+						float x = (LABColors[k]+0.055f)/1.055f;
+						LABColors[k] = (0x1.117542p-12 + x * (-0x5.91e6ap-8 + x * (0x8.0f50ep-4 + x * (0xa.aa231p-4 + x * (-0x2.62787p-4)))));//std::pow((LABColors[k]+0.055f)/1.055f,2.4f);
+					}
+					else
+					{
+						LABColors[k] /= 12.92f;
+					}
+					
+					LABColors[k] *= 100;
+				}
+				
+				for(int k = 0; k < 2; k++)
+				{
+					LABColors[3*k] = LABColors[3*k]*0.4124f+LABColors[1+3*k]*0.3576f+LABColors[2+3*k]*0.1805f;
+					LABColors[1+3*k] = LABColors[3*k]*0.2126f+LABColors[1+3*k]*0.7152f+LABColors[2+3*k]*0.0722f;
+					LABColors[2+3*k] = LABColors[3*k]*0.0193f+LABColors[1+3*k]*0.1192f+LABColors[2+3*k]*0.9505f;
+					
+					LABColors[3*k] /= 95.047f;
+					LABColors[1+3*k] /= 100.0f;
+					LABColors[2+3*k] /= 108.883f;
+					
+					for(int j = 0; j < 3; j++)
+					{
+						if (LABColors[j+3*k] > 0.008856)
+						{
+							LABColors[j+3*k] = std::cbrt(LABColors[j+3*k]);//std::pow(LABColors[j+3*k],1.0/3.0);
+						}
+						else
+						{
+							LABColors[j+3*k] = (7.787f * LABColors[j+3*k]) + (16.0/116.0);
+						}
+					}
+					
+					float col0 = (116.0 * LABColors[1+3*k]) - 16;
+					float col1 = 500.0 * (LABColors[3*k]-LABColors[1+3*k]);
+					float col2 = 200.0 * (LABColors[1+3*k]-LABColors[2+3*k]);
+					
+					LABColors[3*k] = col0;
+					LABColors[1+3*k] = col1;
+					LABColors[2+3*k] = col2;
+				}
 
-				cLAB LABColor = XYZtoLAB(RGBtoXYZ(tempRGB));
-
-				tempRGB.r = pallete_arr[i][0];
-				tempRGB.g = pallete_arr[i][1];
-				tempRGB.b = pallete_arr[i][2];
-
-				cLAB PLABColor = XYZtoLAB(RGBtoXYZ(tempRGB));
-
-				distance = abs(PLABColor.l - LABColor.l) + abs(PLABColor.a - LABColor.a) + abs(PLABColor.b - LABColor.b);
+				distance = abs(LABColors[3] - LABColors[0]) + abs(LABColors[4] - LABColors[1]) + abs(LABColors[5] - LABColors[2]);
 			}
 			if(closestDistance==-1)
 			{

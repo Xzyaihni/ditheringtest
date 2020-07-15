@@ -232,14 +232,14 @@ void DrawItemFunc(LPARAM lParam)
 
 	std::array<int,3> color = colorFromIndex(lpdis->itemID,lpdis->hwndItem);
 
-	RGB rgbColor;
+	cRGB rgbColor;
 	rgbColor.r = color[0];
 	rgbColor.g = color[1];
 	rgbColor.b = color[2];
 
-	LAB colorLAB = XYZtoLAB(RGBtoXYZ(rgbColor));
+	cLAB colorLAB = rgbColor.toXYZ().toLAB();
 
-	RGB rgbColorInv = XYZtoRGB(LABtoXYZ(colorLAB));
+	cRGB rgbColorInv = colorLAB.toXYZ().toRGB();
 
 	selColor = RGB(color[0],color[1],color[2]);
 	selColorInv = RGB(255-rgbColorInv.r,255-rgbColorInv.g,255-rgbColorInv.b);
@@ -532,21 +532,81 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 						for(unsigned char *p = image; p != image+image_size; p += bpp)
 						{
-							float t = 1;
+							int t = 1;
 
 							if(bpp==4)
 							{
 								t = (*(p+3))/255.0;
 							}
-
-							avgImageColor[0]+=(*p)*t;
-							avgImageColor[1]+=(*(p+1))*t;
-							avgImageColor[2]+=(*(p+2))*t;
+							
+							if(color_mode==0)
+							{
+								avgImageColor[0] += (*p)*t;
+								avgImageColor[1] += (*(p+1))*t;
+								avgImageColor[2] += (*(p+2))*t;
+							} else
+							{
+								float LABColors[3] = {(*p)*t,(*(p+1))*t,(*(p+2))*t};
+								for(int k = 0; k < 3; k++)
+								{
+									LABColors[k] /= 255;
+									
+									if(LABColors[k] > 0.04045f)
+									{
+										float x = (LABColors[k]+0.055f)/1.055f;
+										LABColors[k] = (0x1.117542p-12 + x * (-0x5.91e6ap-8 + x * (0x8.0f50ep-4 + x * (0xa.aa231p-4 + x * (-0x2.62787p-4)))));//std::pow((LABColors[k]+0.055f)/1.055f,2.4f);
+									}
+									else
+									{
+										LABColors[k] /= 12.92f;
+									}
+									
+									LABColors[k] *= 100;
+								}
+								
+								LABColors[0] = LABColors[0]*0.4124f+LABColors[1]*0.3576f+LABColors[2]*0.1805f;
+								LABColors[1] = LABColors[0]*0.2126f+LABColors[1]*0.7152f+LABColors[2]*0.0722f;
+								LABColors[2] = LABColors[0]*0.0193f+LABColors[1]*0.1192f+LABColors[2]*0.9505f;
+								
+								LABColors[0] /= 95.047f;
+								LABColors[1] /= 100.0f;
+								LABColors[2] /= 108.883f;
+								
+								for(int k = 0; k < 3; k++)
+								{
+									if (LABColors[k] > 0.008856)
+									{
+										LABColors[k] = std::cbrt(LABColors[k]);//std::pow(LABColors[j+3*k],1.0/3.0);
+									}
+									else
+									{
+										LABColors[k] = (7.787f * LABColors[k]) + (16.0/116.0);
+									}
+								}
+								
+								avgImageColor[0] += (116.0 * LABColors[1]) - 16;
+								avgImageColor[1] += 500.0 * (LABColors[0]-LABColors[1]);
+								avgImageColor[2] += 200.0 * (LABColors[1]-LABColors[2]);
+							}
 						}
+
 
 						for(int i = 0; i < 3; i++)
 						{
 							avgImageColor[i]/=pixel_amount;
+						}
+						
+						if(color_mode==1)
+						{
+							cRGB ccolor;
+							ccolor = cLAB(avgImageColor[0],avgImageColor[1],avgImageColor[2]).toXYZ().toRGB();
+							avgImageColor[0] = ccolor.r;
+							avgImageColor[1] = ccolor.g;
+							avgImageColor[2] = ccolor.b;
+						}
+						
+						for(int i =0; i < 3; i++)
+						{
 							colorMultiply[i]=multiplyScale+(avgColor[i]/avgImageColor[i])*(1-multiplyScale);
 						}
 						for(unsigned char *p = image, *po = output_image; p != image+image_size; p += bpp, po += bpp)
@@ -555,13 +615,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 							int color[3];
 
-							color[0] = std::round(((*p)*colorMultiply[0]) > 255 ? 255 : ((*p)*colorMultiply[0]));
-							color[1] = std::round(((*(p+1))*colorMultiply[1]) > 255 ? 255 : ((*(p+1))*colorMultiply[1]));
-							color[2] = std::round(((*(p+2))*colorMultiply[2]) > 255 ? 255 : ((*(p+2))*colorMultiply[2]));
-
-							*po = (uint8_t)color[0];
-							*(po+1) = (uint8_t)color[1];
-							*(po+2) = (uint8_t)color[2];
+							for(int i = 0; i < 3; i++)
+							{
+								color[i] = std::round(((*(p+i))*colorMultiply[i]) > 255 ? 255 : ((*(p+i))*colorMultiply[i]));
+	
+								*(po+i) = (uint8_t)color[i];
+							}
 							if(bpp==4)
 							{
 								*(po+3) = *(p+3);
@@ -736,17 +795,17 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 				HFONT hFont, hOldFont;
 				LPDRAWITEMSTRUCT lpdis = (LPDRAWITEMSTRUCT)lParam;
 
-				RGB rgbColor;
+				cRGB rgbColor;
 				rgbColor.r = GetRValue(splitMergeColor);
 				rgbColor.g = GetGValue(splitMergeColor);
 				rgbColor.b = GetBValue(splitMergeColor);
 
-				LAB colorLAB = XYZtoLAB(RGBtoXYZ(rgbColor));
+				cLAB colorLAB = rgbColor.toXYZ().toLAB();
 				colorLAB.l *= 0.75;
 				colorLAB.a *= 0.75;
 				colorLAB.b *= 0.75;
 
-				RGB rgbDarkColor = XYZtoRGB(LABtoXYZ(colorLAB));
+				cRGB rgbDarkColor = colorLAB.toXYZ().toRGB();
 
 				SetDCBrushColor(lpdis->hDC,splitMergeColor);
 				SelectObject(lpdis->hDC,GetStockObject(DC_BRUSH));

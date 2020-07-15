@@ -3,6 +3,10 @@
 
 #include <array>
 
+class cRGB;
+class cXYZ;
+class cLAB;
+
 class cRGB
 {
 public:
@@ -10,6 +14,7 @@ public:
 	cRGB(float,float,float);
 	cRGB(std::array<float,3>);
 	std::array<float,3> to_array();
+	cXYZ toXYZ();
 	float r;
 	float g;
 	float b;
@@ -22,6 +27,8 @@ public:
 	cXYZ(float,float,float);
 	cXYZ(std::array<float,3>);
 	std::array<float,3> to_array();
+	cRGB toRGB();
+	cLAB toLAB();
 	float x;
 	float y;
 	float z;
@@ -34,14 +41,10 @@ public:
 	cLAB(float,float,float);
 	cLAB(std::array<float,3>);
 	std::array<float,3> to_array();
+	cXYZ toXYZ();
 	float l;
 	float a;
 	float b;
 };
-
-cXYZ RGBtoXYZ(cRGB);
-cRGB XYZtoRGB(cXYZ);
-cXYZ LABtoXYZ(cLAB);
-cLAB XYZtoLAB(cXYZ);
 
 #endif
