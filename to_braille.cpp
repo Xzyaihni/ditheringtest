@@ -5,7 +5,7 @@
 
 #include "to_braille.h"
 
-void to_braille(unsigned char* pixels, int width, int height, int bpp, std::string outputPath)
+void to_braille(unsigned char* pixels, int width, int height, int bpp, std::string outputPath, bool inverted, bool noEmptyChars)
 {
 	std::wofstream filestream(outputPath.c_str());
 				
@@ -53,6 +53,15 @@ void to_braille(unsigned char* pixels, int width, int height, int bpp, std::stri
 		blockNUM.set(5,bitVals[5]);
 		blockNUM.set(6,bitVals[6]);
 		blockNUM.set(7,bitVals[7]);
+		
+		if(inverted)
+		{
+			blockNUM.flip();
+		}
+		if(noEmptyChars&&blockNUM.none())
+		{
+			blockNUM.set(0,1);
+		}
 		
 		filestream << (wchar_t)(0x2800+blockNUM.to_ulong());
 		if(w==(smallWidth-1))

@@ -22,5 +22,5 @@ to_braille.o: to_braille.cpp
 dithergui.o: dithergui.cpp
 	$(CXX) $(CXXFLAGS) -c dithergui.cpp $(LIBS)
 	
-dithergui: dithergui.o dither.o  image_pallete.o color_spaces.o
+dithergui: dithergui.o dither.o  image_pallete.o color_spaces.o to_braille.o
 	$(CXX) $(CXXFLAGS) dithergui.o dither.o image_pallete.o color_spaces.o to_braille.o -o build/dithergui $(LIBS) -mwindows

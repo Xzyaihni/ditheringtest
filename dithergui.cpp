@@ -1273,8 +1273,11 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 				std::string filepath = (outputPATH.string()+".txt");
 				
 				boost::timer::cpu_timer timer;
+				
+				bool inverted = (bool)IsDlgButtonChecked(hWnd,IDC_INVERTEDCHECKBOX);
+				bool noEmptyChars = (bool)IsDlgButtonChecked(hWnd,IDC_NOSPACECHECKBOX);
 
-				to_braille(pixels,width,height,bpp,filepath);
+				to_braille(pixels,width,height,bpp,filepath,inverted,noEmptyChars);
 				
 				stbi_image_free(pixels);
 				
@@ -1284,6 +1287,26 @@ LRESULT CALLBACK BWBDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 				
 				MessageBox(NULL,finish_message.c_str(),"status",0);
 				
+			}
+			if(LOWORD(wParam)==IDC_NOSPACECHECKBOX)
+			{
+				if(IsDlgButtonChecked(hWnd,IDC_NOSPACECHECKBOX))
+				{
+					CheckDlgButton(hWnd,IDC_NOSPACECHECKBOX,BST_UNCHECKED);
+				} else
+				{
+					CheckDlgButton(hWnd,IDC_NOSPACECHECKBOX,BST_CHECKED);
+				}
+			}
+			if(LOWORD(wParam)==IDC_INVERTEDCHECKBOX)
+			{
+				if(IsDlgButtonChecked(hWnd,IDC_INVERTEDCHECKBOX))
+				{
+					CheckDlgButton(hWnd,IDC_INVERTEDCHECKBOX,BST_UNCHECKED);
+				} else
+				{
+					CheckDlgButton(hWnd,IDC_INVERTEDCHECKBOX,BST_CHECKED);
+				}
 			}
 			break;
 
@@ -1514,6 +1537,9 @@ void AddControlsBWB(HWND hWnd)
 	hBWBInputPath = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","c:/sample/path/image.png",WS_VISIBLE|WS_CHILD|ES_AUTOHSCROLL,40,40,125,25,hWnd,NULL,NULL,NULL);
 	(WNDPROC)SetWindowLongPtr(hBWBInputPath,GWL_WNDPROC,(LONG_PTR)&EditPrc);
 	CreateWindow("button","...",WS_VISIBLE|WS_CHILD,15,40,25,25,hWnd,(HMENU)IDC_BROWSEBWBINPUTBUTTON,NULL,NULL);
+
+	CreateWindow("button","inverted",WS_VISIBLE|WS_CHILD|BS_CHECKBOX,175,15,135,25,hWnd,(HMENU)IDC_INVERTEDCHECKBOX,NULL,NULL);
+	CreateWindow("button","replace empty characters with 1 dot",WS_VISIBLE|WS_CHILD|BS_CHECKBOX|BS_MULTILINE,175,35,135,100,hWnd,(HMENU)IDC_NOSPACECHECKBOX,NULL,NULL);
 
 	CreateWindow("button","convert",WS_VISIBLE|WS_CHILD|WS_BORDER,15,75,150,35,hWnd,(HMENU)IDC_BWBCONVERTBUTTON,NULL,NULL);
 }
@@ -1783,7 +1809,7 @@ void DisplayBWBDialog(HWND hWnd)
 		POINT p;
 		GetCursorPos(&p);
 
-		hBWBDialog = CreateWindow("MyBWBDialogClass","convert black white img to braille",WS_VISIBLE|WS_OVERLAPPED|WS_SYSMENU,p.x-200/2,p.y-100/2,190,145,hWnd,NULL,NULL,NULL);
+		hBWBDialog = CreateWindow("MyBWBDialogClass","convert black white img to braille",WS_VISIBLE|WS_OVERLAPPED|WS_SYSMENU,p.x-200/2,p.y-100/2,320,145,hWnd,NULL,NULL,NULL);
 	}
 }
 
