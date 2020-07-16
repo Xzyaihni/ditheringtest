@@ -446,8 +446,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 							if(targetX==-1)
 							{
 								ratio = (float)height/width;
-								newWidth = targetY;
-								newHeight = (targetY/ratio);
+								newHeight = targetY;
+								newWidth = (targetY/ratio);
 							}
 						} else
 						{
