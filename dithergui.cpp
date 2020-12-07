@@ -1026,6 +1026,7 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 					fullSTR += std::to_string(split_color_pallete[i][1]);
 					fullSTR += " ";
 					fullSTR += std::to_string(split_color_pallete[i][2]);
+					SendMessage(hSplitColorList,LB_ADDSTRING,0,(LPARAM)fullSTR.c_str());
 				}
 			}
 		break;
@@ -1139,7 +1140,7 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				QuickSort(0,pallete.size()-1,pallete);
 				
 				for(unsigned int i = 0; i < pallete.size(); i++)
-				{
+				{			
 					colorTextPair pair;
 					pair.color = pallete[i];
 					pair.text = L"";
@@ -1155,7 +1156,9 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 					fullSTR += std::to_string(color_stringPairs[i].color[1]);
 					fullSTR += " ";
 					fullSTR += std::to_string(color_stringPairs[i].color[2]);
+					SendMessage(hPixelInfoList,LB_ADDSTRING,0,(LPARAM)fullSTR.c_str());
 				}
+
 			}
 			break;
 
