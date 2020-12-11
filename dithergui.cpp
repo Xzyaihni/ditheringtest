@@ -1165,7 +1165,7 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 					colorTextPair collink;
 					for(int k = 0; k < 3; k++)
 					{
-						color[k] = std::stoi(colstrlinks[i].substr(0,3));
+						color[k] = std::stoi(colstrlinks[i].substr(k*3,3));
 					}
 					
 					for(int k = 0; k < color_stringPairs.size(); k++)
@@ -1174,6 +1174,7 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 						{
 							colstrlinks[i].erase(0,9);
 							color_stringPairs[k].text = colstrlinks[i].c_str();
+							break;
 						}
 					}
 				}
