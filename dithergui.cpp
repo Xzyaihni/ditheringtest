@@ -70,6 +70,7 @@ HWND hHueTrack;
 HWND hColorList;
 
 HWND hITTInputPath;
+HWND hITTAutoColorsEdit;
 
 HWND hPixelInfoList;
 
@@ -1037,6 +1038,44 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 	return 0;
 }
 
+LRESULT LOADIMAGEITT(LPARAM lParam)
+{
+	char imagepathSTR[1024];
+	GetWindowText(hITTInputPath,imagepathSTR,1024);
+	boost::filesystem::path inputPATH(imagepathSTR);
+
+	if(!boost::filesystem::exists(inputPATH.string()))
+	{
+		MessageBox(NULL,"input file doesn't exist","exception",0);
+		return 0;
+	}
+	
+	color_stringPairs.clear();
+	
+	std::vector<std::array<int,3>> pallete = GetPallete(inputPATH.string());
+	QuickSort(0,pallete.size()-1,pallete);
+	
+	for(unsigned int i = 0; i < pallete.size(); i++)
+	{			
+		colorTextPair pair;
+		pair.color = pallete[i];
+		pair.text = L"";
+		color_stringPairs.push_back(pair);
+	}
+	
+	SendMessage(hPixelInfoList,LB_RESETCONTENT,0,0);
+	for(unsigned int i = 0; i < color_stringPairs.size(); i++)
+	{
+		std::string fullSTR;
+		fullSTR += std::to_string(color_stringPairs[i].color[0]);
+		fullSTR += " ";
+		fullSTR += std::to_string(color_stringPairs[i].color[1]);
+		fullSTR += " ";
+		fullSTR += std::to_string(color_stringPairs[i].color[2]);
+		SendMessage(hPixelInfoList,LB_ADDSTRING,0,(LPARAM)fullSTR.c_str());
+	}
+}
+
 LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	switch(message)
@@ -1076,8 +1115,15 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				int width, height, bpp;
 				
 				char imagepathSTR[1024];
+				//you might run out of character space with this thing but who cares
+				//change both the 4096's to something bigger if you care
+				char autocolorsCSTR[4096];
 				GetWindowText(hITTInputPath,imagepathSTR,1024);
+				GetWindowText(hITTAutoColorsEdit,autocolorsCSTR,4096);
 				boost::filesystem::path inputPATH(imagepathSTR);
+				
+				std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+				std::wstring autocolorsSTR = converter.from_bytes(autocolorsCSTR);;
 				
 				if(!boost::filesystem::exists(inputPATH.string()))
 				{
@@ -1097,6 +1143,46 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 				std::wofstream filestream(filepath.c_str());
 				
 				filestream.imbue(std::locale(filestream.getloc(), new std::codecvt_utf8_utf16<wchar_t>));
+				
+				size_t pos = 0;
+				std::wstring match;
+				std::vector<std::wstring> colstrlinks;
+				while ((pos = autocolorsSTR.find(L";")) != std::string::npos) 
+				{
+					match = autocolorsSTR.substr(0, pos);
+					colstrlinks.push_back(match);
+					autocolorsSTR.erase(0, pos+1);
+				}
+				
+				colstrlinks.push_back(autocolorsSTR);
+				
+				
+				//i wanted to add a thing that checks the amount of colors to describe each pixel for like black and white only pictures
+				//but nobody cares about those just convert them to rgb
+				for(int i = 0; i < colstrlinks.size(); i++)
+				{
+					std::array<int,3> color;
+					colorTextPair collink;
+					for(int k = 0; k < 3; k++)
+					{
+						color[k] = std::stoi(colstrlinks[i].substr(0,3));
+					}
+					
+					for(int k = 0; k < color_stringPairs.size(); k++)
+					{
+						if(color==color_stringPairs[k].color)
+						{
+							continue;
+						}
+					}
+					
+					colstrlinks[i].erase(0,9);
+					
+					collink.color = color;
+					collink.text = colstrlinks[i].c_str();
+					
+					color_stringPairs.push_back(collink);
+				}
 				
 				int eap = 0;
 				for(unsigned char *p = pixels; p != pixels+image_size; p += bpp, eap += bpp)
@@ -1119,46 +1205,20 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 					}
 				}
 				
+				/*for(int i = 0; i < color_stringPairs.size(); i++)
+				{
+					std::string cols = (std::to_string(color_stringPairs[i].color[0])+","+std::to_string(color_stringPairs[i].color[1])+","+std::to_string(color_stringPairs[i].color[2]));
+					MessageBox(NULL,(cols+"///"+converter.to_bytes(color_stringPairs[i].text)+"   "+std::to_string(color_stringPairs.size())).c_str(),"exception",0);
+				}*/
+				
 				filestream.close();
 				stbi_image_free(pixels);
+				
+				return LOADIMAGEITT(lParam);
 			}
 			if(LOWORD(wParam)==IDC_LOADITTIMAGEBUTTON)
 			{
-				char imagepathSTR[1024];
-				GetWindowText(hITTInputPath,imagepathSTR,1024);
-				boost::filesystem::path inputPATH(imagepathSTR);
-
-				if(!boost::filesystem::exists(inputPATH.string()))
-				{
-					MessageBox(NULL,"input file doesn't exist","exception",0);
-					return 0;
-				}
-				
-				color_stringPairs.clear();
-				
-				std::vector<std::array<int,3>> pallete = GetPallete(inputPATH.string());
-				QuickSort(0,pallete.size()-1,pallete);
-				
-				for(unsigned int i = 0; i < pallete.size(); i++)
-				{			
-					colorTextPair pair;
-					pair.color = pallete[i];
-					pair.text = L"";
-					color_stringPairs.push_back(pair);
-				}
-				
-				SendMessage(hPixelInfoList,LB_RESETCONTENT,0,0);
-				for(unsigned int i = 0; i < color_stringPairs.size(); i++)
-				{
-					std::string fullSTR;
-					fullSTR += std::to_string(color_stringPairs[i].color[0]);
-					fullSTR += " ";
-					fullSTR += std::to_string(color_stringPairs[i].color[1]);
-					fullSTR += " ";
-					fullSTR += std::to_string(color_stringPairs[i].color[2]);
-					SendMessage(hPixelInfoList,LB_ADDSTRING,0,(LPARAM)fullSTR.c_str());
-				}
-
+				return LOADIMAGEITT(lParam);
 			}
 			break;
 
@@ -1509,6 +1569,10 @@ void AddControlsITT(HWND hWnd)
 	CreateWindow("button","load",WS_VISIBLE|WS_CHILD,15,75,150,25,hWnd,(HMENU)IDC_LOADITTIMAGEBUTTON,NULL,NULL);
 
 	CreateWindow("button","convert",WS_VISIBLE|WS_CHILD|WS_BORDER,15,110,150,35,hWnd,(HMENU)IDC_CONVERTTOTEXTBUTTON,NULL,NULL);
+	
+	CreateWindow("static","link colors to text (click on listbox buttons above they're better)",WS_VISIBLE|WS_CHILD|ES_CENTER,15,150,330,50,hWnd,NULL,NULL,NULL);
+	hITTAutoColorsEdit = CreateWindowEx(WS_EX_CLIENTEDGE,"edit","000255255text here;127127127some symbol;005002090you get it",WS_VISIBLE|WS_CHILD|ES_AUTOHSCROLL,15,190,330,25,hWnd,NULL,NULL,NULL);
+	(WNDPROC)SetWindowLongPtr(hITTAutoColorsEdit,GWL_WNDPROC,(LONG_PTR)&EditPrc);
 }
 
 void AddControlsSplit(HWND hWnd)
@@ -1779,7 +1843,7 @@ void DisplayITTDialog(HWND hWnd)
 	{
 		POINT p;
 		GetCursorPos(&p);
-		hITTDialog = CreateWindow("MyDialogClass","image to text",WS_OVERLAPPED|WS_VISIBLE|WS_SYSMENU,p.x-200/2,p.y-100/2,360,185,hWnd,NULL,NULL,NULL);
+		hITTDialog = CreateWindow("MyDialogClass","image to text",WS_OVERLAPPED|WS_VISIBLE|WS_SYSMENU,p.x-200/2,p.y-100/2,360,250,hWnd,NULL,NULL,NULL);
 	}
 }
 
