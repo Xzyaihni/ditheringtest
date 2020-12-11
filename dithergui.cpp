@@ -1172,16 +1172,10 @@ LRESULT CALLBACK DialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam
 					{
 						if(color==color_stringPairs[k].color)
 						{
-							continue;
+							colstrlinks[i].erase(0,9);
+							color_stringPairs[k].text = colstrlinks[i].c_str();
 						}
 					}
-					
-					colstrlinks[i].erase(0,9);
-					
-					collink.color = color;
-					collink.text = colstrlinks[i].c_str();
-					
-					color_stringPairs.push_back(collink);
 				}
 				
 				int eap = 0;
