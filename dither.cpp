@@ -60,25 +60,18 @@ unsigned char* dither_image(unsigned char *image_unres, int width, int height, i
 
 	for(unsigned char *p = image, *po = output_image; p != image+image_size; p += bpp, po += colors, eap += colors)
 	{
-		float t = 1;
-		
 		int closestIndex = 0;
 		float closestDistance = -1;
 		
 		float color[3];
 		int closestColor[3];
 		
-		if(bpp==4)
-		{
-			t = (*(p+3))/255.0;
-		}
-		
 		int h = (int)((eap/colors)/width);
 		int w = (eap/colors)%width;
 		
 		for(int i = 0; i < 3; i++)
 		{
-			color[i] = round((*(p+i))*t);
+			color[i] = round((*(p+i))*(!(bpp==4)+((*(p+3))/255.0)*(bpp==4)));
 			
 			color[i] = color[i]+errors[w][h][i];
 		}
@@ -162,7 +155,6 @@ unsigned char* dither_image(unsigned char *image_unres, int width, int height, i
 		}
 		
 		float error[3];
-		float part = 48;
 		float error7[3];
 		float error5[3];
 		float error3[3];
@@ -178,7 +170,7 @@ unsigned char* dither_image(unsigned char *image_unres, int width, int height, i
 		{
 			closestColor[i] = pallete_arr[closestIndex][i];
 			
-			error[i] = (color[i]-closestColor[i])/part;
+			error[i] = (color[i]-closestColor[i])/48.0;
 			error7[i] = error[i]*7;
 			error5[i] = error[i]*5;
 			error3[i] = error[i]*3;
@@ -247,7 +239,7 @@ unsigned char* dither_image(unsigned char *image_unres, int width, int height, i
 		}
 		if(transparency==1)
 		{
-			*(po+3) = *(p+3)==255?255:0;
+			*(po+3) = (*(p+3)>127)*255;
 		}
 	}
 
