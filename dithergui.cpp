@@ -14,6 +14,7 @@
 #include <windows.h>
 #include <commctrl.h>
 #include <resource.h>
+#include <stdint.h>
 
 #include "dither.h"
 #include "image_pallete.h"
@@ -154,6 +155,83 @@ std::array<int, 3> colorFromIndex(int index, HWND hWnd)
 inline bool isBiggerThan(std::array<int,3> c1, std::array<int,3> c2)
 {
 	return ((c1[0]>c2[0]) || ((c1[0]==c2[0])&&(c1[1]>c2[1])) || ((c1[0]==c2[0])&&(c1[1]==c2[1])&&(c1[2]>c2[2])));
+}
+
+inline int getDigit(int *numbers, int i, int base, int maxDigits, int digit)
+{
+	return numbers[i]==0 ? 0 : (int)(numbers[i]/std::pow(base,maxDigits-digit))%base;
+}
+
+void RadixSort(std::vector<std::array<int,3>>& colorList)
+{
+	int base = 256;
+	int counter[base] = {};
+	int maxDigits = 1;
+	
+	int64_t counterBase = base;
+	while(true)
+	{
+		if(counterBase<255255255)
+		{
+			maxDigits++;
+			counterBase *= base;
+		} else
+		{
+			break;
+		}
+	}
+	
+	int listSize = colorList.size();
+	int numbers[listSize];
+	int outputNumbers[listSize];
+	for(int i = 0; i < listSize; i++)
+	{
+		numbers[i] = colorList[i][0]*1000000 + colorList[i][1]*1000 + colorList[i][2];
+	}
+	
+	int chosenDigit = 0;
+	for (int digit = maxDigits; digit>0; digit--)
+	{
+		for(int i = 0; i < listSize; i++)
+		{
+			chosenDigit = getDigit(numbers, i, base, maxDigits, digit);
+			counter[chosenDigit]++;
+		}
+		for(int k = 0; k < base; k++)
+		{
+			if(k!=0)
+			{
+				counter[k] += counter[k-1];
+			}
+		}
+		for(int i = listSize-1; i >= 0; i--)
+		{
+			chosenDigit = getDigit(numbers, i, base, maxDigits, digit);
+			outputNumbers[--counter[chosenDigit]] = numbers[i];
+		}
+		//reassigning the array 1 by 1 could be optimized with references but *yawn*
+		for(int i = 0; i < listSize; i++)
+		{
+			numbers[i] = outputNumbers[i];
+		}
+		for(int i = 0; i < base; i++)
+		{
+			counter[i] = 0;
+		}
+	}
+	
+	std::array<int, 3> col;
+	std::vector<std::array<int,3>> sortedArr;
+	for(int i = 0; i < listSize; i++)
+	{
+		col[0] = (int)(outputNumbers[i]/1000000);
+		col[1] = ((int)(outputNumbers[i]/1000))-((int)(outputNumbers[i]/1000000))*1000;
+		col[2] = outputNumbers[i]-(((int)(outputNumbers[i]/1000000))*1000000)-((((int)(outputNumbers[i]/1000))*1000)-(((int)(outputNumbers[i]/1000000))*1000000));
+		//could be made faster
+		
+		sortedArr.push_back(col);
+	}
+	colorList = sortedArr;
 }
 
 void QuickSort(int start, int end, std::vector<std::array<int,3>>& colorList)
@@ -721,7 +799,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 					return 0;
 				}
 				
-				QuickSort(0, color_pallete.size()-1, color_pallete);
+				RadixSort(color_pallete);
 				UpdateColorList();
 			}
 			
@@ -1014,7 +1092,7 @@ LRESULT CALLBACK SplitDialogPrc(HWND hWnd, UINT message, WPARAM wParam, LPARAM l
 				}
 
 				split_color_pallete = GetPallete(inputPATH.string());
-				QuickSort(0,split_color_pallete.size()-1,split_color_pallete);
+				RadixSort(split_color_pallete);
 				split_color_group.clear();
 
 				SendMessage(hSplitColorList,LB_RESETCONTENT,0,0);
@@ -1053,7 +1131,7 @@ LRESULT LOADIMAGEITT(LPARAM lParam)
 	color_stringPairs.clear();
 	
 	std::vector<std::array<int,3>> pallete = GetPallete(inputPATH.string());
-	QuickSort(0,pallete.size()-1,pallete);
+	RadixSort(pallete);
 	
 	for(unsigned int i = 0; i < pallete.size(); i++)
 	{			
